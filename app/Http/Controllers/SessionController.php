@@ -31,8 +31,12 @@ class SessionController extends Controller
 
     public function store(Request $request)
     {
+        $data = $request->validate([
+            'date' => 'nullable|date',
+        ]);
+
         $session = WorkoutSession::create([
-            'date' => $request->input('date', now()->format('Y-m-d')),
+            'date' => $data['date'] ?? now()->format('Y-m-d'),
         ]);
 
         return redirect()->route('sessions.show', $session);
