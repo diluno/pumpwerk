@@ -19,7 +19,7 @@ const best = computed(() => {
 </script>
 
 <template>
-    <Head :title="`${machine.name} · Workout`" />
+    <Head :title="`${machine.name} · Pumpwerk`" />
     <AppLayout>
         <header class="rise-in mb-6">
             <Link href="/" class="mb-3 inline-flex items-center gap-1 text-sm text-muted active:text-ink">

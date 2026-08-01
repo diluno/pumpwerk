@@ -5,12 +5,12 @@ const form = useForm({ email: '', password: '' });
 </script>
 
 <template>
-    <Head title="Login · Workout" />
+    <Head title="Login · Pumpwerk" />
     <div class="mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-6">
         <div class="rise-in">
             <div class="mb-10">
                 <div class="mb-3 h-1.5 w-16 bg-volt" />
-                <h1 class="font-display text-6xl uppercase leading-none">Work<br />out.</h1>
+                <h1 class="font-display text-6xl uppercase leading-none">Pump<br />werk.</h1>
             </div>
 
             <form class="space-y-4" @submit.prevent="form.post('/login')">

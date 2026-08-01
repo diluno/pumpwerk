@@ -24,8 +24,8 @@ export default defineConfig({
             buildBase: '/build/',
             scope: '/',
             manifest: {
-                name: 'Workout',
-                short_name: 'Workout',
+                name: 'Pumpwerk',
+                short_name: 'Pumpwerk',
                 description: 'Personal workout tracker',
                 start_url: '/',
                 display: 'standalone',

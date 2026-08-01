@@ -68,7 +68,7 @@ const paceLabel = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2
 </script>
 
 <template>
-    <Head :title="`${session.date} · Workout`" />
+    <Head :title="`${session.date} · Pumpwerk`" />
     <AppLayout>
         <header class="rise-in mb-5">
             <Link href="/" class="mb-3 inline-flex items-center gap-1 text-sm text-muted active:text-ink">

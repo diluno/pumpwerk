@@ -61,7 +61,7 @@ watch([selected, metric], () => setTimeout(draw));
 </script>
 
 <template>
-    <Head title="Progress · Workout" />
+    <Head title="Progress · Pumpwerk" />
     <AppLayout>
         <header class="rise-in mb-6">
             <div class="mb-2 h-1.5 w-12 bg-volt" />

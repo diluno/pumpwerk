@@ -1,0 +1,98 @@
+#ddev-generated
+# If you remove the ddev-generated line above you
+# are responsible for maintaining this file. DDEV will not then
+# update it, for example if you add `additional_hostnames`, etc.
+
+http:
+  routers:
+    workout-tracker-web-80-http:
+      entrypoints:
+        - http-80
+      rule: HostRegexp(`^workout-tracker\.ddev\.site$`)
+      
+      service: "workout-tracker-web-80"
+      tls: false
+      # middlewares:
+      #   - "workout-tracker-redirectHttps"
+    workout-tracker-web-8025-http:
+      entrypoints:
+        - http-8025
+      rule: HostRegexp(`^workout-tracker\.ddev\.site$`)
+      
+      service: "workout-tracker-web-8025"
+      tls: false
+      # middlewares:
+      #   - "workout-tracker-redirectHttps"
+    workout-tracker-xhgui-80-http:
+      entrypoints:
+        - http-8143
+      rule: HostRegexp(`^workout-tracker\.ddev\.site$`)
+      
+      service: "workout-tracker-xhgui-80"
+      tls: false
+      # middlewares:
+      #   - "workout-tracker-redirectHttps"
+    
+    
+    
+    workout-tracker-web-80-https:
+      entrypoints:
+        - http-443
+      rule: HostRegexp(`^workout-tracker\.ddev\.site$`)
+      
+      service: "workout-tracker-web-80"
+      
+      tls: true
+      
+    workout-tracker-web-8025-https:
+      entrypoints:
+        - http-8026
+      rule: HostRegexp(`^workout-tracker\.ddev\.site$`)
+      
+      service: "workout-tracker-web-8025"
+      
+      tls: true
+      
+    
+    workout-tracker-xhgui-80-https:
+      entrypoints:
+        - http-8142
+      rule: HostRegexp(`^workout-tracker\.ddev\.site$`)
+      
+      service: "workout-tracker-xhgui-80"
+      
+      tls: true
+      
+    
+
+  middlewares:
+    workout-tracker-redirectHttps:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+  services:
+    workout-tracker-web-80:
+      loadbalancer:
+        servers:
+          - url: http://ddev-workout-tracker-web:80
+        
+    workout-tracker-web-8025:
+      loadbalancer:
+        servers:
+          - url: http://ddev-workout-tracker-web:8025
+        
+    
+    
+    workout-tracker-xhgui-80:
+      loadbalancer:
+        servers:
+          - url: http://ddev-workout-tracker-xhgui:80
+        
+    
+    
+
+tls:
+  certificates:
+    - certFile: /mnt/ddev-global-cache/traefik/certs/workout-tracker.crt
+      keyFile: /mnt/ddev-global-cache/traefik/certs/workout-tracker.key

@@ -29,7 +29,7 @@ function startSession() {
 </script>
 
 <template>
-    <Head title="Sessions · Workout" />
+    <Head title="Sessions · Pumpwerk" />
     <AppLayout>
         <header class="rise-in mb-6 flex items-end justify-between">
             <div>

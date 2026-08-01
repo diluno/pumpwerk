@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <link rel="manifest" href="/build/manifest.webmanifest">
-    <title inertia>Workout</title>
+    <title inertia>Pumpwerk</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @inertiaHead
 </head>
