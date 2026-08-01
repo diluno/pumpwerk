@@ -1,0 +1,95 @@
+@import 'tailwindcss';
+@import '@fontsource/anton';
+@import '@fontsource/barlow/400.css';
+@import '@fontsource/barlow/500.css';
+@import '@fontsource/barlow/600.css';
+@import '@fontsource/barlow/700.css';
+
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Anton', 'Barlow', sans-serif;
+
+    --color-bg: #101110;
+    --color-surface: #1a1c19;
+    --color-raised: #23261f;
+    --color-line: #2e332b;
+    --color-ink: #edefea;
+    --color-muted: #8a9086;
+    --color-volt: #c8f542;
+    --color-volt-bright: #d9ff57;
+    --color-volt-ink: #151705;
+    --color-danger: #ff6b5e;
+}
+
+html {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    min-height: 100dvh;
+    /* subtle industrial texture: faint diagonal hatch */
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent 0,
+        transparent 11px,
+        rgb(255 255 255 / 0.012) 11px,
+        rgb(255 255 255 / 0.012) 12px
+    );
+}
+
+.font-display {
+    letter-spacing: 0.01em;
+}
+
+/* Big numeric inputs: kill spinners */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+@keyframes rise-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.rise-in {
+    animation: rise-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes sheet-up {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+.sheet-up {
+    animation: sheet-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes flash-volt {
+    0% {
+        background-color: rgb(200 245 66 / 0.25);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+.flash-volt {
+    animation: flash-volt 0.9s ease-out both;
+}
