@@ -8,8 +8,9 @@ import CardioSheet from '../../Components/CardioSheet.vue';
 import BottomSheet from '../../Components/BottomSheet.vue';
 import { renderMarkdown } from '../../markdown';
 
-const props = defineProps({ session: Object, lastByMachine: Object });
+const props = defineProps({ session: Object, lastByMachine: Object, previousFeedback: Object });
 
+const coachOpen = ref(false);
 const pickerOpen = ref(false);
 const cardioOpen = ref(false);
 const finishOpen = ref(false);
@@ -100,6 +101,27 @@ const paceLabel = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2
         </header>
 
         <div class="space-y-4">
+            <section
+                v-if="previousFeedback"
+                class="rise-in overflow-hidden rounded-2xl border border-volt/40 bg-volt/5"
+            >
+                <button class="flex w-full items-center justify-between px-4 py-3" @click="coachOpen = !coachOpen">
+                    <span class="font-display text-lg uppercase text-volt">Coach's plan · {{ previousFeedback.date }}</span>
+                    <svg
+                        class="h-5 w-5 text-volt transition-transform"
+                        :class="{ 'rotate-180': coachOpen }"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    >
+                        <path d="M6 9l6 6 6-6" />
+                    </svg>
+                </button>
+                <div
+                    v-if="coachOpen"
+                    class="space-y-2 border-t border-volt/20 px-4 py-3 text-sm leading-relaxed text-ink/90 [&_strong]:text-volt [&_ul]:list-disc [&_ul]:pl-5 [&_h3]:font-bold [&_h4]:font-bold [&_h5]:font-bold"
+                    v-html="renderMarkdown(previousFeedback.text)"
+                />
+            </section>
+
             <ExerciseCard
                 v-for="e in session.exercises"
                 :key="e.id"

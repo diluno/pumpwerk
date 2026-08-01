@@ -48,7 +48,26 @@ class SessionController extends Controller
             $lastByMachine[$exercise->machine_id] = $this->lastPerformance($exercise->machine_id, $session->id);
         }
 
+        // On an open session, surface the coach feedback from the most recent
+        // previous session so its "next session targets" are visible while training.
+        $previousFeedback = null;
+        if ($session->finished_at === null) {
+            $prev = WorkoutSession::whereNotNull('ai_feedback')
+                ->where('id', '!=', $session->id)
+                ->where('date', '<=', $session->date)
+                ->orderByDesc('date')
+                ->orderByDesc('created_at')
+                ->first();
+            if ($prev) {
+                $previousFeedback = [
+                    'date' => $prev->date->format('Y-m-d'),
+                    'text' => $prev->ai_feedback,
+                ];
+            }
+        }
+
         return Inertia::render('Sessions/Show', [
+            'previousFeedback' => $previousFeedback,
             'session' => [
                 'id' => $session->id,
                 'date' => $session->date->format('Y-m-d'),
