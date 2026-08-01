@@ -174,6 +174,9 @@ const paceLabel = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2
             </section>
         </div>
 
+        <!-- Spacer so content can scroll clear of the floating finish bar -->
+        <div v-if="!readonly" class="h-20" />
+
         <!-- Deliberate finish flow: separate action with summary confirmation -->
         <div
             v-if="!readonly"
