@@ -48,7 +48,8 @@ class PlanController extends Controller
             .($note !== '' ? "\n\nTODAY'S REQUEST FROM THE ATHLETE (must be respected): {$note}" : '')
             ."\n\nWrite today's plan in Markdown (max ~200 words): an ordered list of machines with target weight × reps × sets"
             .' (progress sensibly from recent history), plus a cardio suggestion. If the athlete mentioned pain or a limitation,'
-            .' avoid aggravating exercises and say what you swapped and why in one short line. No preamble.';
+            .' avoid aggravating exercises and say what you swapped and why in one short line. No preamble.'
+            .' Use bullet or numbered lists, not tables.';
 
         $response = Http::withToken($apiKey)
             ->timeout(90)->post('https://api.openai.com/v1/chat/completions', [

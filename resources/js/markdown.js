@@ -9,6 +9,22 @@ function inline(s) {
         .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
 }
 
+function isTableRow(line) {
+    return /^\s*\|.*\|\s*$/.test(line);
+}
+
+function isTableSeparator(line) {
+    return /^\s*\|?\s*:?-{2,}.*\|.*$/.test(line) && /^[\s|:-]+$/.test(line);
+}
+
+function splitRow(line) {
+    return line
+        .trim()
+        .replace(/^\||\|$/g, '')
+        .split('|')
+        .map((c) => c.trim());
+}
+
 export function renderMarkdown(md) {
     const lines = escapeHtml(md).split('\n');
     const out = [];
@@ -21,8 +37,30 @@ export function renderMarkdown(md) {
         }
     };
 
-    for (const raw of lines) {
+    for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i];
         const line = raw.trimEnd();
+
+        // Pipe table: header row + separator row, then body rows
+        if (isTableRow(line) && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+            closeList();
+            const header = splitRow(line);
+            const body = [];
+            let j = i + 2;
+            while (j < lines.length && isTableRow(lines[j])) {
+                body.push(splitRow(lines[j]));
+                j++;
+            }
+            out.push('<div class="table-scroll"><table>');
+            out.push('<thead><tr>' + header.map((c) => `<th>${inline(c)}</th>`).join('') + '</tr></thead>');
+            out.push('<tbody>');
+            for (const row of body) {
+                out.push('<tr>' + row.map((c) => `<td>${inline(c)}</td>`).join('') + '</tr>');
+            }
+            out.push('</tbody></table></div>');
+            i = j - 1;
+            continue;
+        }
         const h = line.match(/^(#{1,4})\s+(.*)/);
         const ul = line.match(/^\s*[-*]\s+(.*)/);
         const ol = line.match(/^\s*\d+[.)]\s+(.*)/);

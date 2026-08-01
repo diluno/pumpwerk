@@ -43,7 +43,7 @@ class AiFeedbackController extends Controller
             ."TODAY:\n{$format($session)}\n\n"
             .'RECENT HISTORY (newest first):'."\n"
             .$history->map($format)->implode("\n\n")
-            ."\n\nGive concise feedback in Markdown (max ~250 words): 1) What went well / notable progress, 2) Anything to watch (imbalances, stalls, jumps), 3) Concrete suggested weights/reps per machine for the next session. Be specific with numbers.";
+            ."\n\nGive concise feedback in Markdown (max ~250 words): 1) What went well / notable progress, 2) Anything to watch (imbalances, stalls, jumps), 3) Concrete suggested weights/reps per machine for the next session. Be specific with numbers. Use headings and bullet lists, not tables.";
 
         $response = Http::withToken($apiKey)
             ->timeout(90)->post('https://api.openai.com/v1/chat/completions', [
