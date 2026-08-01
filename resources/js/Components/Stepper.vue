@@ -21,7 +21,7 @@ function bump(dir) {
         <div class="flex items-center overflow-hidden rounded-xl border border-line bg-raised">
             <button
                 type="button"
-                class="h-14 w-12 text-2xl font-bold text-muted active:bg-line active:text-ink"
+                class="h-14 w-10 text-2xl font-bold text-muted active:bg-line active:text-ink"
                 @click="bump(-1)"
             >
                 −
@@ -39,7 +39,7 @@ function bump(dir) {
             </div>
             <button
                 type="button"
-                class="h-14 w-12 text-2xl font-bold text-muted active:bg-line active:text-ink"
+                class="h-14 w-10 text-2xl font-bold text-muted active:bg-line active:text-ink"
                 @click="bump(1)"
             >
                 +

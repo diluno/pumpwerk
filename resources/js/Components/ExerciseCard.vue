@@ -92,11 +92,13 @@ function removeExercise() {
             </li>
         </ul>
 
-        <div v-if="!readonly" class="flex items-end justify-between gap-3 px-4 py-3">
-            <Stepper v-model="weight" label="Weight" unit="kg" :step="2.5" />
-            <Stepper v-model="reps" label="Reps" :step="1" />
+        <div v-if="!readonly" class="px-4 py-3">
+            <div class="mb-3 flex items-end justify-center gap-4">
+                <Stepper v-model="weight" label="Weight" unit="kg" :step="2.5" />
+                <Stepper v-model="reps" label="Reps" :step="1" />
+            </div>
             <button
-                class="font-display h-14 flex-1 rounded-xl bg-volt text-lg text-volt-ink uppercase active:bg-volt-bright"
+                class="font-display h-12 w-full rounded-xl bg-volt text-lg text-volt-ink uppercase active:bg-volt-bright"
                 @click="addSet"
             >
                 Log set
