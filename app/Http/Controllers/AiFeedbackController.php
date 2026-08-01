@@ -9,8 +9,8 @@ class AiFeedbackController extends Controller
 {
     public function store(WorkoutSession $session)
     {
-        $apiKey = config('services.anthropic.key');
-        abort_unless($apiKey, 503, 'No Anthropic API key configured');
+        $apiKey = config('services.openai.key');
+        abort_unless($apiKey, 503, 'No OpenAI API key configured');
 
         $session->load(['exercises.machine', 'exercises.sets', 'cardioEntries']);
 
@@ -45,20 +45,17 @@ class AiFeedbackController extends Controller
             .$history->map($format)->implode("\n\n")
             ."\n\nGive concise feedback in Markdown (max ~250 words): 1) What went well / notable progress, 2) Anything to watch (imbalances, stalls, jumps), 3) Concrete suggested weights/reps per machine for the next session. Be specific with numbers.";
 
-        $response = Http::withHeaders([
-            'x-api-key' => $apiKey,
-            'anthropic-version' => '2023-06-01',
-        ])->timeout(90)->post('https://api.anthropic.com/v1/messages', [
-            'model' => 'claude-sonnet-5',
-            'max_tokens' => 4000, // the model spends part of this on a thinking block
-            'messages' => [['role' => 'user', 'content' => $prompt]],
-        ]);
+        $response = Http::withToken($apiKey)
+            ->timeout(90)->post('https://api.openai.com/v1/chat/completions', [
+                'model' => 'gpt-5.6-terra',
+                'max_completion_tokens' => 4000,
+                'messages' => [['role' => 'user', 'content' => $prompt]],
+            ]);
 
-        abort_unless($response->successful(), 502, 'Anthropic API error: '.$response->status());
+        abort_unless($response->successful(), 502, 'OpenAI API error: '.$response->status());
 
-        // Content may lead with a thinking block; take the first text block.
-        $text = collect($response->json('content'))->firstWhere('type', 'text')['text'] ?? null;
-        abort_unless($text, 502, 'Anthropic returned no text');
+        $text = $response->json('choices.0.message.content');
+        abort_unless($text, 502, 'OpenAI returned no text');
 
         $session->update(['ai_feedback' => $text]);
 

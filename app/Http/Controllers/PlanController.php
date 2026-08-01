@@ -11,8 +11,8 @@ class PlanController extends Controller
 {
     public function store(Request $request, WorkoutSession $session)
     {
-        $apiKey = config('services.anthropic.key');
-        abort_unless($apiKey, 503, 'No Anthropic API key configured');
+        $apiKey = config('services.openai.key');
+        abort_unless($apiKey, 503, 'No OpenAI API key configured');
 
         $note = trim((string) $request->input('note', ''));
 
@@ -50,19 +50,17 @@ class PlanController extends Controller
             .' (progress sensibly from recent history), plus a cardio suggestion. If the athlete mentioned pain or a limitation,'
             .' avoid aggravating exercises and say what you swapped and why in one short line. No preamble.';
 
-        $response = Http::withHeaders([
-            'x-api-key' => $apiKey,
-            'anthropic-version' => '2023-06-01',
-        ])->timeout(90)->post('https://api.anthropic.com/v1/messages', [
-            'model' => 'claude-sonnet-5',
-            'max_tokens' => 4000, // the model spends part of this on a thinking block
-            'messages' => [['role' => 'user', 'content' => $prompt]],
-        ]);
+        $response = Http::withToken($apiKey)
+            ->timeout(90)->post('https://api.openai.com/v1/chat/completions', [
+                'model' => 'gpt-5.6-terra',
+                'max_completion_tokens' => 4000,
+                'messages' => [['role' => 'user', 'content' => $prompt]],
+            ]);
 
-        abort_unless($response->successful(), 502, 'Anthropic API error: '.$response->status());
+        abort_unless($response->successful(), 502, 'OpenAI API error: '.$response->status());
 
-        $text = collect($response->json('content'))->firstWhere('type', 'text')['text'] ?? null;
-        abort_unless($text, 502, 'Anthropic returned no text');
+        $text = $response->json('choices.0.message.content');
+        abort_unless($text, 502, 'OpenAI returned no text');
 
         $session->update(['plan' => $text, 'plan_prompt' => $note ?: null]);
 
