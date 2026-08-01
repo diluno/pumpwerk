@@ -15,7 +15,7 @@ class AiFeedbackController extends Controller
             ."TODAY:\n{$coach->formatSession($session)}\n\n"
             .'RECENT HISTORY (newest first):'."\n"
             .$coach->formatHistory($coach->recentHistory($session))
-            ."\n\nGive concise feedback in Markdown (max ~250 words): 1) What went well / notable progress, 2) Anything to watch (imbalances, stalls, jumps), 3) Concrete suggested weights/reps per machine for the next session. Be specific with numbers. Use headings and bullet lists, not tables.";
+            ."\n\nGive concise feedback in Markdown (max ~250 words): 1) What went well / notable progress, 2) Anything to watch (imbalances, stalls, jumps), 3) Concrete suggested weights/reps per machine for the next session. Be specific with numbers. All weights are in lb; machines adjust in 20lb steps (30, 50, 70, …) plus optional add-on plates of 2.3, 4.5, or 6.8 lb — only suggest weights reachable that way. Use headings and bullet lists, not tables.";
 
         $session->update(['ai_feedback' => $coach->complete($prompt)]);
 

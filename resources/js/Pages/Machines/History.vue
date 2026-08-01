@@ -31,7 +31,7 @@ const best = computed(() => {
             <div class="mb-2 h-1.5 w-12 bg-volt" />
             <h1 class="font-display text-4xl uppercase leading-none">{{ machine.name }}</h1>
             <p v-if="best" class="mt-3 text-sm text-muted">
-                Best set: <b class="font-display text-lg text-volt">{{ best.weight }}kg × {{ best.reps }}</b>
+                Best set: <b class="font-display text-lg text-volt">{{ best.weight }}lb × {{ best.reps }}</b>
                 <span class="ml-1">({{ best.date }})</span>
             </p>
         </header>

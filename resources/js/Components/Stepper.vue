@@ -2,6 +2,8 @@
 const props = defineProps({
     modelValue: { type: [Number, String], default: 0 },
     step: { type: Number, default: 1 },
+    // Optional (current, dir) => next; overrides linear stepping
+    stepFn: { type: Function, default: null },
     min: { type: Number, default: 0 },
     label: String,
     unit: String,
@@ -10,7 +12,9 @@ const emit = defineEmits(['update:modelValue']);
 
 function bump(dir) {
     const current = parseFloat(props.modelValue) || 0;
-    const next = Math.max(props.min, Math.round((current + dir * props.step) * 100) / 100);
+    const next = props.stepFn
+        ? props.stepFn(current, dir)
+        : Math.max(props.min, Math.round((current + dir * props.step) * 100) / 100);
     emit('update:modelValue', next);
 }
 </script>

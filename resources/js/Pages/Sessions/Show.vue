@@ -112,7 +112,7 @@ const paceLabel = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2
             <div class="mt-3 flex gap-4 text-sm text-muted">
                 <span><b class="text-ink">{{ session.exercises.length }}</b> machines</span>
                 <span><b class="text-ink">{{ totalSets }}</b> sets</span>
-                <span><b class="text-ink">{{ totalVolume.toLocaleString() }}</b> kg volume</span>
+                <span><b class="text-ink">{{ totalVolume.toLocaleString() }}</b> lb volume</span>
             </div>
             <p v-if="readonly" class="mt-3 inline-flex items-center gap-2 rounded-lg bg-raised px-3 py-1.5 text-sm text-muted">
                 Session finished
@@ -296,7 +296,7 @@ const paceLabel = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2
 
         <BottomSheet :open="finishOpen" title="Finish session?" @close="finishOpen = false">
             <ul class="mb-4 space-y-1 text-sm text-muted">
-                <li><b class="text-ink">{{ session.exercises.length }}</b> machines · <b class="text-ink">{{ totalSets }}</b> sets · <b class="text-ink">{{ totalVolume.toLocaleString() }}</b> kg</li>
+                <li><b class="text-ink">{{ session.exercises.length }}</b> machines · <b class="text-ink">{{ totalSets }}</b> sets · <b class="text-ink">{{ totalVolume.toLocaleString() }}</b> lb</li>
                 <li v-if="session.cardio.length"><b class="text-ink">{{ session.cardio.length }}</b> cardio {{ session.cardio.length === 1 ? 'entry' : 'entries' }}</li>
             </ul>
 

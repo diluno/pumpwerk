@@ -25,7 +25,7 @@ class CoachService
     {
         $lines = ["Session {$s->date->format('Y-m-d')}:"];
         foreach ($s->exercises as $e) {
-            $sets = $e->sets->map(fn ($set) => "{$set->weight}kg x {$set->reps}")->implode(', ');
+            $sets = $e->sets->map(fn ($set) => "{$set->weight}lb x {$set->reps}")->implode(', ');
             $lines[] = "- {$e->machine->name}: {$sets}".($e->notes ? " (note: {$e->notes})" : '');
         }
         foreach ($s->cardioEntries as $c) {

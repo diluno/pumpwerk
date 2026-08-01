@@ -110,7 +110,7 @@ watch([selected, metric], () => setTimeout(draw));
                 <div class="rounded-xl border border-line bg-surface px-4 py-3">
                     <p class="text-[10px] font-bold tracking-widest text-muted uppercase">Best set</p>
                     <p class="font-display text-2xl text-volt">
-                        {{ machine.points.at(-1)?.best_set?.weight }}kg × {{ machine.points.at(-1)?.best_set?.reps }}
+                        {{ machine.points.at(-1)?.best_set?.weight }}lb × {{ machine.points.at(-1)?.best_set?.reps }}
                     </p>
                     <p class="text-xs text-muted">most recent session</p>
                 </div>

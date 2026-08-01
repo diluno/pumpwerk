@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import Stepper from './Stepper.vue';
+import { stepMachineWeight } from '../machineWeight.js';
 
 const props = defineProps({
     exercise: Object,
@@ -10,7 +11,7 @@ const props = defineProps({
 });
 
 const lastSets = props.last?.sets ?? [];
-const seed = lastSets[0] ?? props.exercise.sets[props.exercise.sets.length - 1] ?? { weight: 20, reps: 10 };
+const seed = lastSets[0] ?? props.exercise.sets[props.exercise.sets.length - 1] ?? { weight: 30, reps: 10 };
 const weight = ref(seed.weight);
 const reps = ref(seed.reps);
 const justAdded = ref(false);
@@ -73,7 +74,7 @@ function removeExercise() {
             >
                 <span class="w-6 text-center text-xs font-bold text-muted">{{ set.set_number }}</span>
                 <span class="font-display flex-1 text-2xl">
-                    {{ set.weight }}<span class="ml-0.5 text-xs text-muted">kg</span>
+                    {{ set.weight }}<span class="ml-0.5 text-xs text-muted">lb</span>
                     <span class="mx-2 text-line">/</span>
                     {{ set.reps }}<span class="ml-0.5 text-xs text-muted">reps</span>
                 </span>
@@ -94,7 +95,7 @@ function removeExercise() {
 
         <div v-if="!readonly" class="px-4 py-3">
             <div class="mb-3 flex items-end justify-center gap-4">
-                <Stepper v-model="weight" label="Weight" unit="kg" :step="2.5" />
+                <Stepper v-model="weight" label="Weight" unit="lb" :step-fn="stepMachineWeight" />
                 <Stepper v-model="reps" label="Reps" :step="1" />
             </div>
             <button
