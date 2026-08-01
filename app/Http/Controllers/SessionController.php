@@ -73,6 +73,8 @@ class SessionController extends Controller
                 'date' => $session->date->format('Y-m-d'),
                 'notes' => $session->notes,
                 'ai_feedback' => $session->ai_feedback,
+                'plan' => $session->plan,
+                'plan_prompt' => $session->plan_prompt,
                 'finished' => $session->finished_at !== null,
                 'exercises' => $session->exercises->map(fn ($e) => [
                     'id' => $e->id,

@@ -42,4 +42,5 @@ Route::middleware('auth')->group(function () {
     Route::get('/progression', [ProgressionController::class, 'index'])->name('progression');
 
     Route::post('/sessions/{session}/ai-feedback', [AiFeedbackController::class, 'store'])->name('ai-feedback.store');
+    Route::post('/sessions/{session}/plan', [\App\Http\Controllers\PlanController::class, 'store'])->name('plan.store');
 });

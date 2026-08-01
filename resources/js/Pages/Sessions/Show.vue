@@ -11,6 +11,10 @@ import { renderMarkdown } from '../../markdown';
 const props = defineProps({ session: Object, lastByMachine: Object, previousFeedback: Object });
 
 const coachOpen = ref(false);
+const planOpen = ref(true);
+const planSheetOpen = ref(false);
+const planNote = ref('');
+const planLoading = ref(false);
 const pickerOpen = ref(false);
 const cardioOpen = ref(false);
 const finishOpen = ref(false);
@@ -65,6 +69,22 @@ function saveNotes(e) {
     router.patch(`/sessions/${props.session.id}`, { notes: e.target.value }, { preserveScroll: true });
 }
 
+function generatePlan() {
+    planLoading.value = true;
+    router.post(
+        `/sessions/${props.session.id}/plan`,
+        { note: planNote.value },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                planSheetOpen.value = false;
+                planOpen.value = true;
+            },
+            onFinish: () => (planLoading.value = false),
+        },
+    );
+}
+
 const paceLabel = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}/km` : null);
 </script>
 
@@ -101,6 +121,45 @@ const paceLabel = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2
         </header>
 
         <div class="space-y-4">
+            <!-- Today's plan: generate on demand, optionally steered by a note -->
+            <section v-if="!readonly && session.plan" class="rise-in overflow-hidden rounded-2xl border border-volt bg-volt/10">
+                <button class="flex w-full items-center justify-between px-4 py-3" @click="planOpen = !planOpen">
+                    <span class="font-display text-lg uppercase text-volt">Today's plan</span>
+                    <span class="flex items-center gap-3">
+                        <span
+                            class="rounded-lg px-2 py-1 text-xs font-semibold text-volt/80 underline-offset-2 hover:underline"
+                            @click.stop="planSheetOpen = true"
+                        >
+                            Redo
+                        </span>
+                        <svg
+                            class="h-5 w-5 text-volt transition-transform"
+                            :class="{ 'rotate-180': planOpen }"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        >
+                            <path d="M6 9l6 6 6-6" />
+                        </svg>
+                    </span>
+                </button>
+                <div v-if="planOpen" class="border-t border-volt/20 px-4 py-3">
+                    <p v-if="session.plan_prompt" class="mb-2 text-xs italic text-muted">"{{ session.plan_prompt }}"</p>
+                    <div
+                        class="space-y-2 text-sm leading-relaxed text-ink/90 [&_strong]:text-volt [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_h3]:font-bold [&_h4]:font-bold [&_h5]:font-bold"
+                        v-html="renderMarkdown(session.plan)"
+                    />
+                </div>
+            </section>
+            <button
+                v-else-if="!readonly"
+                class="rise-in flex w-full items-center justify-center gap-2 rounded-2xl border border-volt/50 py-3.5 font-semibold text-volt active:bg-volt/10"
+                @click="planSheetOpen = true"
+            >
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2L4.09 12.11a.6.6 0 0 0 .45 1h5.96l-1.5 8.89L18.91 11.9a.6.6 0 0 0-.45-1h-5.96z" />
+                </svg>
+                Plan today's session
+            </button>
+
             <section
                 v-if="previousFeedback"
                 class="rise-in overflow-hidden rounded-2xl border border-volt/40 bg-volt/5"
@@ -211,6 +270,26 @@ const paceLabel = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2
                 Finish session
             </button>
         </div>
+
+        <BottomSheet :open="planSheetOpen" title="Plan today" @close="planSheetOpen = false">
+            <p class="mb-3 text-sm text-muted">
+                The coach looks at your recent sessions and drafts today's machines, weights and reps.
+                Anything it should know?
+            </p>
+            <textarea
+                v-model="planNote"
+                rows="3"
+                placeholder="Optional — e.g. my knee hurts, plan around it / short on time, 30 min only / focus on upper body"
+                class="mb-4 w-full resize-none rounded-xl border border-line bg-raised px-4 py-3 text-sm outline-none placeholder:text-muted/60 focus:border-volt"
+            />
+            <button
+                class="font-display w-full rounded-xl bg-volt py-4 text-xl text-volt-ink uppercase active:bg-volt-bright disabled:opacity-60"
+                :disabled="planLoading"
+                @click="generatePlan"
+            >
+                {{ planLoading ? 'Thinking…' : session.plan ? 'Regenerate plan' : 'Generate plan' }}
+            </button>
+        </BottomSheet>
 
         <MachinePicker :open="pickerOpen" :used-machine-ids="usedMachineIds" @close="pickerOpen = false" @pick="addExercise" />
         <CardioSheet :open="cardioOpen" :session-id="session.id" @close="cardioOpen = false" />
