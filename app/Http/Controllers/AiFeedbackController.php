@@ -50,13 +50,17 @@ class AiFeedbackController extends Controller
             'anthropic-version' => '2023-06-01',
         ])->timeout(90)->post('https://api.anthropic.com/v1/messages', [
             'model' => 'claude-sonnet-5',
-            'max_tokens' => 1024,
+            'max_tokens' => 4000, // the model spends part of this on a thinking block
             'messages' => [['role' => 'user', 'content' => $prompt]],
         ]);
 
         abort_unless($response->successful(), 502, 'Anthropic API error: '.$response->status());
 
-        $session->update(['ai_feedback' => $response->json('content.0.text')]);
+        // Content may lead with a thinking block; take the first text block.
+        $text = collect($response->json('content'))->firstWhere('type', 'text')['text'] ?? null;
+        abort_unless($text, 502, 'Anthropic returned no text');
+
+        $session->update(['ai_feedback' => $text]);
 
         return back();
     }
