@@ -52,6 +52,29 @@ class AiCoachTest extends TestCase
         $this->assertSame('## Great session', $this->session->fresh()->ai_feedback);
     }
 
+    public function test_feedback_prompt_constrains_machines_and_weights(): void
+    {
+        config(['services.openai.key' => 'test-key']);
+        Http::fake([
+            'api.openai.com/*' => Http::response([
+                'choices' => [['message' => ['content' => '## ok']]],
+            ]),
+        ]);
+
+        $this->actingAs($this->user)
+            ->post("/sessions/{$this->session->id}/ai-feedback")
+            ->assertRedirect();
+
+        Http::assertSent(function ($request) {
+            $body = $request['messages'][0]['content'];
+
+            return str_contains($body, 'AVAILABLE MACHINES')
+                && str_contains($body, 'Chest Press')
+                && str_contains($body, '32.3, 34.5, 36.8')
+                && str_contains($body, 'no kilograms');
+        });
+    }
+
     public function test_feedback_returns_502_on_api_error(): void
     {
         config(['services.openai.key' => 'test-key']);
@@ -83,5 +106,28 @@ class AiCoachTest extends TestCase
 
         Http::assertSent(fn ($request) => str_contains($request->body(), 'shoulder hurts')
             && $request['model'] === config('services.openai.model'));
+    }
+
+    public function test_plan_prompt_constrains_machines_and_weights(): void
+    {
+        config(['services.openai.key' => 'test-key']);
+        Http::fake([
+            'api.openai.com/*' => Http::response([
+                'choices' => [['message' => ['content' => '1. Chest Press']]],
+            ]),
+        ]);
+
+        $this->actingAs($this->user)
+            ->post("/sessions/{$this->session->id}/plan")
+            ->assertRedirect();
+
+        Http::assertSent(function ($request) {
+            $body = $request['messages'][0]['content'];
+
+            return str_contains($body, 'AVAILABLE MACHINES')
+                && str_contains($body, 'Chest Press')
+                && str_contains($body, '32.3, 34.5, 36.8')
+                && str_contains($body, 'no kilograms');
+        });
     }
 }
