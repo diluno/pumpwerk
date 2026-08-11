@@ -1,6 +1,6 @@
 # Infra — Pumpwerk
 
-Personal workout tracker (Laravel 12 + Inertia/Vue 3). Audited 2026-08-02.
+Personal workout tracker (Laravel 12 + Inertia/Vue 3). Audited 2026-08-02, re-verified 2026-08-11.
 
 ## Hosting
 - **Laravel Forge** on **willow** — `ssh forge@167.233.123.148` (alias `willow` in `~/.zshrc`).
@@ -8,12 +8,14 @@ Personal workout tracker (Laravel 12 + Inertia/Vue 3). Audited 2026-08-02.
 - Site: `/home/forge/pumpwerk.dil.uno`, zero-downtime layout (`releases/` + `current` symlink,
   shared `.env`, `database/`, `storage/` at site root). `pumpwerk.on-forge.com` is a vestigial
   empty site dir from provisioning.
-- Server: PHP 8.5.7, Node 22, nginx-fpm. No sudo for the forge user.
+- Server: PHP 8.5.7, Node 22.22.3, nginx-fpm. No sudo for the forge user. Disk: 11 G used of 38 G (31%).
 
 ## Deploys
-- **Quick-deploy is on**: pushing to `main` on GitHub triggers a Forge deploy. Verified — commit
-  `0836721` (pushed 2026-08-02 shortly after midnight) is live and its migration ran (`migrate:status`
-  shows `add_workout_indexes` Ran), so the deploy script includes `php artisan migrate`.
+- **Quick-deploy is on**: pushing to `main` on GitHub triggers a Forge deploy. Re-verified
+  2026-08-11 — commit `6cc41cb` was live within ~1 min of the push and `public/build/` was
+  regenerated in the same release, so the script runs both `npm run build` and `php artisan migrate`
+  (the latter confirmed 2026-08-02 by `add_workout_indexes` showing Ran).
+- Server clock and logs are UTC; local time is CEST (+2), so release timestamps look 2 h "early".
 - Deploy script itself lives in the Forge dashboard (not readable from the server shell).
 - The release checkout uses an OAuth-token HTTPS remote managed by Forge — never copy that
   remote URL anywhere.
@@ -33,14 +35,19 @@ Personal workout tracker (Laravel 12 + Inertia/Vue 3). Audited 2026-08-02.
 ## Third-party services
 - **OpenAI** — AI coach feedback and plans (`gpt-5.6-terra`, overridable via `OPENAI_MODEL`).
   Key in the server's `.env` (`OPENAI_API_KEY`) and in the Forge env editor.
+- Stale `ANTHROPIC_API_KEY` still sits in the production `.env` from before the OpenAI switch.
+  Unused by the code — remove it from the Forge env editor.
 
 ## Cron
 - No forge-user crontab; no Laravel scheduler entries. Only system cron (certbot renewals, php, sysstat).
 
 ## Backups — ⚠️ NOT COVERED
-- **willow is one of the servers with no fleet backups** (no `~/.restic-env`, no
-  `~/bin/backup-sites.sh`, no cron). The production SQLite file — the only copy of all live
-  workout data — is protected by nothing. Same for the other sites on willow.
+- **Still true as of 2026-08-11.** `backup-status` reports 5/14 servers covered and lists willow
+  under NO BACKUPS CONFIGURED — no `~/.restic-env`, no `~/bin/backup-sites.sh`, no forge crontab.
+  The production SQLite file (`database/database.sqlite`, 352 KB, last written 2026-08-11 06:15 UTC)
+  is the only copy of all live workout data and is protected by nothing. Same for the other sites
+  on willow. Newest snapshot anywhere in the fleet is ~6 h old — the bucket is healthy, willow
+  simply isn't in it.
 - **Caveat when onboarding willow to the fleet convention:** `backup-sites.sh` discovers
   *MySQL-style* databases from `.env` files and uploads from `~/*/storage/assets`. Pumpwerk's
   SQLite file matches neither pattern — after the standard setup, add the site's `database/`

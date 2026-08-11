@@ -25,12 +25,8 @@ function addSet() {
             onSuccess: () => {
                 justAdded.value = true;
                 setTimeout(() => (justAdded.value = false), 900);
-                // prefill next set from last time's corresponding set
-                const next = lastSets[props.exercise.sets.length];
-                if (next) {
-                    weight.value = next.weight;
-                    reps.value = next.reps;
-                }
+                // keep the values just logged — the next set within a session
+                // carries forward from the previous set, not from last session
             },
         },
     );
