@@ -160,7 +160,7 @@ class WorkoutFlowTest extends TestCase
         $this->get("/sessions/{$session->id}")->assertInertia(fn ($page) => $page->where('machines.0.name', 'Row'));
         $exercise = $session->exercises()->first();
         $this->get("/exercises/{$exercise->id}")->assertInertia(fn ($page) => $page
-            ->component('Sessions/Machine', false)
+            ->component('Sessions/Machine')
             ->where('exercise.sets.0.weight', 50)
             ->where('position', 1)
             ->where('count', 1));

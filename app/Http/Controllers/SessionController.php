@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Machine;
 use App\Models\WorkoutSession;
+use App\Services\GymService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -33,6 +34,8 @@ class SessionController extends Controller
 
         return Inertia::render('Sessions/Index', [
             'sessions' => $sessions,
+            // Live gym counts may need a request to the gyms, so they arrive after the page.
+            'gyms' => Inertia::defer(fn () => app(GymService::class)->current()),
         ]);
     }
 

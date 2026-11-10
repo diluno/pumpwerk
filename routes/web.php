@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CardioController;
 use App\Http\Controllers\CoachController;
 use App\Http\Controllers\ExerciseController;
+use App\Http\Controllers\GymController;
 use App\Http\Controllers\MachineController;
 use App\Http\Controllers\ProgressionController;
 use App\Http\Controllers\SessionController;
@@ -38,6 +39,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/cardio/{cardio}', [CardioController::class, 'destroy'])->name('cardio.destroy');
 
     Route::get('/machines/{machine}', [MachineController::class, 'history'])->name('machines.history');
+
+    Route::get('/gyms', [GymController::class, 'index'])->name('gyms');
 
     Route::get('/progression', [ProgressionController::class, 'index'])->name('progression');
 

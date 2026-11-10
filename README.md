@@ -10,6 +10,7 @@ Built as a single-user app: no registration, no multi-tenancy, just fast logging
 - **Machine history** — pick a machine and see everything you've ever done on it.
 - **Progression charts** — one bar per session for each machine, coloured by weight band.
 - **AI coach** — on-demand feedback for a finished session and a plan for the next one (with an optional steering note), powered by OpenAI.
+- **Gym visitors** — live visitor counts of four Fitnesspark gyms, sampled every 10 minutes, with a typical-day curve and a week heatmap showing when each gym is quiet.
 - **PWA** — installable on the home screen for quick access at the gym.
 
 ## Stack
@@ -62,6 +63,10 @@ Copy `.env.example` and set:
 - `artisan import:v1` imports data from the previous tracker (one-time, kept for reference).
 - Prompt/LLM logic lives in `app/Services/CoachService.php`.
 - Dates are plain `YYYY-MM-DD`; the client sends its local date when starting a session and parses dates via `resources/js/format.js` (never `new Date('YYYY-MM-DD')`, which is UTC).
+
+## Gym visitor counts
+
+`config/gyms.php` lists the gyms and the public Fitnesspark endpoint. `artisan gyms:poll` stores one count per gym in `gym_samples`; the scheduler runs it every 10 minutes between 06:00 and 23:00 Zurich time (`routes/console.php`). **The server needs the scheduler cron** (`* * * * * php artisan schedule:run`), otherwise counts are only saved when someone opens the app and no pattern builds up. Statistics cover the last 8 weeks; samples older than 180 days are pruned.
 
 ## Testing & linting
 

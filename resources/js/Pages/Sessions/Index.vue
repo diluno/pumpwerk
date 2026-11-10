@@ -1,12 +1,16 @@
 <script setup>
 import { computed } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, Deferred, router } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 import BandBars from '../../Components/BandBars.vue';
+import CountUp from '../../Components/CountUp.vue';
 import { startSession } from '../../session.js';
 import { parseDate, toYmd, formatDate, daysBetween, plural } from '../../format.js';
 
-const props = defineProps({ sessions: Array });
+const props = defineProps({
+    sessions: Array,
+    gyms: Array, // deferred live visitor counts: [{ key, name, visitors }]
+});
 
 const active = computed(() => props.sessions.find((s) => !s.finished));
 const past = computed(() => props.sessions.filter((s) => s !== active.value));
@@ -73,6 +77,29 @@ function logout() {
             </svg>
         </Link>
         <button v-else class="btn-primary mt-[1.125rem] h-[4.25rem] w-full text-2xl" @click="startSession">Start today’s session</button>
+
+        <!-- How full the gyms are right now; the page behind it says when to go -->
+        <Link href="/gyms" class="card press mt-2 block px-5 py-4" aria-label="Gyms: visitors right now and quiet hours">
+            <span class="flex items-center justify-between">
+                <span class="font-extrabold tracking-tight">In the gyms right now</span>
+                <svg class="h-5 w-5 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 5l7 7-7 7" />
+                </svg>
+            </span>
+            <Deferred data="gyms">
+                <template #fallback>
+                    <span class="breathe mt-3 block h-[3.25rem] rounded-2xl bg-soft" />
+                </template>
+                <span class="mt-2 grid grid-cols-4 gap-2">
+                    <span v-for="g in gyms" :key="g.key" class="min-w-0">
+                        <span class="block text-[1.75rem] leading-none font-extrabold tracking-tight">
+                            <CountUp v-if="g.visitors !== null" :value="g.visitors" /><template v-else>–</template>
+                        </span>
+                        <span class="mt-1 block truncate text-[0.8125rem] text-muted">{{ g.name }}</span>
+                    </span>
+                </span>
+            </Deferred>
+        </Link>
 
         <p v-if="!sessions.length" class="mt-6 text-muted">
             Nothing logged yet. Start a session, add the machines you use, and your history builds up here.

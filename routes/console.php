@@ -1,8 +1,11 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+// Sample gym visitor counts while the gyms are open. Needs the scheduler cron
+// on the server: * * * * * php artisan schedule:run
+Schedule::command('gyms:poll')
+    ->everyTenMinutes()
+    ->timezone(config('gyms.timezone'))
+    ->between(config('gyms.hours.0').':00', config('gyms.hours.1').':00')
+    ->withoutOverlapping();

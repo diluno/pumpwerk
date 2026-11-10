@@ -33,12 +33,18 @@ Personal workout tracker (Laravel 12 + Inertia/Vue 3). Audited 2026-08-02, re-ve
   No MySQL/MariaDB involved despite Forge defaults.
 
 ## Third-party services
+- **Fitnesspark visitor endpoint** — public WordPress AJAX endpoint on `www.fitnesspark.ch`, no key.
+  Polled for four gyms every 10 minutes during opening hours (`config/gyms.php`).
 - **OpenAI** — AI coach feedback and plans (`gpt-5.6-terra`, overridable via `OPENAI_MODEL`).
   Key in the server's `.env` (`OPENAI_API_KEY`) and in the Forge env editor.
 - Stale `ANTHROPIC_API_KEY` still sits in the production `.env` from before the OpenAI switch.
   Unused by the code — remove it from the Forge env editor.
 
 ## Cron
+- **Needed since the gym visitor feature (2026-11-10):** the Laravel scheduler must run every minute
+  (`* * * * * cd /home/forge/pumpwerk.dil.uno/current && php artisan schedule:run`) so `gyms:poll`
+  samples visitor counts every 10 minutes. Add it in Forge (Scheduler) once the feature is deployed;
+  as of 2026-11-10 it is NOT set up yet (see line below).
 - No forge-user crontab; no Laravel scheduler entries. Only system cron (certbot renewals, php, sysstat).
 
 ## Backups — ⚠️ NOT COVERED
