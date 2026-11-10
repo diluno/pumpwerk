@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\WorkoutSession;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -37,7 +38,10 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
-            //
+            // The session currently being logged, for the "Today" tab.
+            'activeSessionId' => fn () => $request->user()
+                ? WorkoutSession::open()->orderByDesc('date')->orderByDesc('id')->value('id')
+                : null,
         ];
     }
 }

@@ -11,17 +11,24 @@ class SessionController extends Controller
 {
     public function index()
     {
-        $sessions = WorkoutSession::withCount(['exercises', 'cardioEntries'])
+        $sessions = WorkoutSession::query()
+            ->select(['id', 'date', 'finished_at'])
+            ->selectRaw('ai_feedback IS NOT NULL as has_feedback')
+            ->with(['exercises' => fn ($q) => $q->withCount('sets')->withMax('sets', 'weight'), 'exercises.machine:id,name'])
+            ->withCount('cardioEntries')
             ->orderByDesc('date')
-            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get()
             ->map(fn ($s) => [
                 'id' => $s->id,
                 'date' => $s->date->format('Y-m-d'),
-                'finished' => $s->finished_at !== null,
-                'exercise_count' => $s->exercises_count,
+                'finished' => $s->isFinished(),
+                'machines' => $s->exercises->map(fn ($e) => $e->machine->name)->values(),
+                // Top weight per machine, for the coloured bars
+                'weights' => $s->exercises->pluck('sets_max_weight')->filter()->map(fn ($w) => (float) $w)->values(),
+                'set_count' => $s->exercises->sum('sets_count'),
                 'cardio_count' => $s->cardio_entries_count,
-                'has_feedback' => $s->ai_feedback !== null,
+                'has_feedback' => (bool) $s->has_feedback,
             ]);
 
         return Inertia::render('Sessions/Index', [
@@ -34,10 +41,11 @@ class SessionController extends Controller
         $data = $request->validate([
             'date' => 'nullable|date',
         ]);
+        $date = $data['date'] ?? now()->format('Y-m-d');
 
-        $session = WorkoutSession::create([
-            'date' => $data['date'] ?? now()->format('Y-m-d'),
-        ]);
+        // Starting twice on the same day (double tap, second device) continues the open session.
+        $session = WorkoutSession::open()->whereDate('date', $date)->first()
+            ?? WorkoutSession::create(['date' => $date]);
 
         return redirect()->route('sessions.show', $session);
     }
@@ -46,32 +54,7 @@ class SessionController extends Controller
     {
         $session->load(['exercises.machine', 'exercises.sets', 'cardioEntries']);
 
-        // Last performance per machine used in this session, for "last time" prefill
-        $lastByMachine = [];
-        foreach ($session->exercises as $exercise) {
-            $lastByMachine[$exercise->machine_id] = $this->lastPerformance($exercise->machine_id, $session->id);
-        }
-
-        // On an open session, surface the coach feedback from the most recent
-        // previous session so its "next session targets" are visible while training.
-        $previousFeedback = null;
-        if ($session->finished_at === null) {
-            $prev = WorkoutSession::whereNotNull('ai_feedback')
-                ->where('id', '!=', $session->id)
-                ->where('date', '<=', $session->date)
-                ->orderByDesc('date')
-                ->orderByDesc('created_at')
-                ->first();
-            if ($prev) {
-                $previousFeedback = [
-                    'date' => $prev->date->format('Y-m-d'),
-                    'text' => $prev->ai_feedback,
-                ];
-            }
-        }
-
         return Inertia::render('Sessions/Show', [
-            'previousFeedback' => $previousFeedback,
             'session' => [
                 'id' => $session->id,
                 'date' => $session->date->format('Y-m-d'),
@@ -79,37 +62,30 @@ class SessionController extends Controller
                 'ai_feedback' => $session->ai_feedback,
                 'plan' => $session->plan,
                 'plan_prompt' => $session->plan_prompt,
-                'finished' => $session->finished_at !== null,
+                'finished' => $session->isFinished(),
                 'exercises' => $session->exercises->map(fn ($e) => [
                     'id' => $e->id,
                     'machine_id' => $e->machine_id,
                     'machine_name' => $e->machine->name,
                     'notes' => $e->notes,
-                    'sets' => $e->sets->map(fn ($s) => [
-                        'id' => $s->id,
-                        'set_number' => $s->set_number,
-                        'weight' => $s->weight,
-                        'reps' => $s->reps,
-                    ]),
+                    'sets' => $e->sets->map->only(['id', 'set_number', 'weight', 'reps']),
                 ]),
-                'cardio' => $session->cardioEntries->map(fn ($c) => [
-                    'id' => $c->id,
-                    'type' => $c->type,
-                    'duration_minutes' => $c->duration_minutes,
-                    'pace_seconds' => $c->pace_seconds,
-                    'distance_km' => $c->distance_km,
-                    'notes' => $c->notes,
+                'cardio' => $session->cardioEntries->map->only([
+                    'id', 'type', 'duration_minutes', 'pace_seconds', 'distance_km', 'notes',
                 ]),
             ],
-            'lastByMachine' => $lastByMachine,
+            'lastByMachine' => (object) $session->lastPerformances(),
+            'previousFeedback' => $session->isFinished() ? null : $this->previousFeedback($session),
+            // Only an open session can add machines.
+            'machines' => $session->isFinished() ? [] : Machine::forPicker(),
         ]);
     }
 
     public function update(Request $request, WorkoutSession $session)
     {
         $session->update($request->validate([
-            'date' => 'sometimes|date',
-            'notes' => 'nullable|string',
+            'date' => 'sometimes|required|date',
+            'notes' => 'sometimes|nullable|string|max:5000',
         ]));
 
         return back();
@@ -119,7 +95,8 @@ class SessionController extends Controller
     {
         $session->update(['finished_at' => now()]);
 
-        return redirect()->route('sessions.index');
+        // Stay on the session: the finished view leads with the coach feedback.
+        return redirect()->route('sessions.show', $session);
     }
 
     public function reopen(WorkoutSession $session)
@@ -136,26 +113,17 @@ class SessionController extends Controller
         return redirect()->route('sessions.index');
     }
 
-    private function lastPerformance(int $machineId, int $excludeSessionId): ?array
+    /**
+     * Coach feedback from the most recent earlier session, so its
+     * "next session" targets are at hand while training.
+     */
+    private function previousFeedback(WorkoutSession $session): ?array
     {
-        $exercise = \App\Models\Exercise::where('machine_id', $machineId)
-            ->where('workout_session_id', '!=', $excludeSessionId)
-            ->whereHas('session')
-            ->with(['sets', 'session'])
-            ->get()
-            ->sortByDesc(fn ($e) => $e->session->date)
-            ->first();
+        $previous = WorkoutSession::whereNotNull('ai_feedback')->before($session)->first();
 
-        if (! $exercise) {
-            return null;
-        }
-
-        return [
-            'date' => $exercise->session->date->format('Y-m-d'),
-            'sets' => $exercise->sets->map(fn ($s) => [
-                'weight' => $s->weight,
-                'reps' => $s->reps,
-            ])->values()->all(),
-        ];
+        return $previous ? [
+            'date' => $previous->date->format('Y-m-d'),
+            'text' => $previous->ai_feedback,
+        ] : null;
     }
 }

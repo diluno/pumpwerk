@@ -27,13 +27,15 @@ class AiCoachTest extends TestCase
         $exercise->sets()->create(['set_number' => 1, 'weight' => 40, 'reps' => 12]);
     }
 
-    public function test_feedback_returns_503_without_api_key(): void
+    public function test_feedback_without_api_key_reports_an_error(): void
     {
         config(['services.openai.key' => null]);
 
         $this->actingAs($this->user)
+            ->from("/sessions/{$this->session->id}")
             ->post("/sessions/{$this->session->id}/ai-feedback")
-            ->assertStatus(503);
+            ->assertRedirect("/sessions/{$this->session->id}")
+            ->assertSessionHasErrors('coach');
     }
 
     public function test_feedback_is_stored_on_success(): void
@@ -52,16 +54,30 @@ class AiCoachTest extends TestCase
         $this->assertSame('## Great session', $this->session->fresh()->ai_feedback);
     }
 
-    public function test_feedback_returns_502_on_api_error(): void
+    public function test_api_error_reports_an_error_and_stores_nothing(): void
     {
         config(['services.openai.key' => 'test-key']);
         Http::fake(['api.openai.com/*' => Http::response(['error' => 'boom'], 500)]);
 
         $this->actingAs($this->user)
             ->post("/sessions/{$this->session->id}/ai-feedback")
-            ->assertStatus(502);
+            ->assertRedirect()
+            ->assertSessionHasErrors('coach');
 
         $this->assertNull($this->session->fresh()->ai_feedback);
+    }
+
+    public function test_timeout_reports_an_error(): void
+    {
+        config(['services.openai.key' => 'test-key']);
+        Http::fake(['api.openai.com/*' => Http::failedConnection()]);
+
+        $this->actingAs($this->user)
+            ->post("/sessions/{$this->session->id}/plan")
+            ->assertRedirect()
+            ->assertSessionHasErrors('coach');
+
+        $this->assertNull($this->session->fresh()->plan);
     }
 
     public function test_plan_is_stored_with_note(): void

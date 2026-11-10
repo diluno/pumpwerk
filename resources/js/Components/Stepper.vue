@@ -1,4 +1,6 @@
 <script setup>
+import { useId } from 'vue';
+
 const props = defineProps({
     modelValue: { type: [Number, String], default: 0 },
     step: { type: Number, default: 1 },
@@ -6,9 +8,10 @@ const props = defineProps({
     stepFn: { type: Function, default: null },
     min: { type: Number, default: 0 },
     label: String,
-    unit: String,
+    placeholder: { type: String, default: '0' },
 });
 const emit = defineEmits(['update:modelValue']);
+const id = useId();
 
 function bump(dir) {
     const current = parseFloat(props.modelValue) || 0;
@@ -20,34 +23,21 @@ function bump(dir) {
 </script>
 
 <template>
-    <div class="flex flex-col items-center gap-1">
-        <span class="text-[10px] font-semibold tracking-widest text-muted uppercase">{{ label }}</span>
-        <div class="flex touch-manipulation items-center overflow-hidden rounded-xl border border-line bg-raised">
-            <button
-                type="button"
-                class="h-14 w-10 touch-manipulation text-2xl font-bold text-muted select-none active:bg-line active:text-ink"
-                @click="bump(-1)"
-            >
-                −
-            </button>
-            <div class="relative w-[4.5rem]">
-                <input
-                    type="number"
-                    inputmode="decimal"
-                    :value="modelValue"
-                    class="font-display w-full bg-transparent py-2 text-center text-3xl text-ink outline-none"
-                    @input="emit('update:modelValue', $event.target.value)"
-                    @focus="$event.target.select()"
-                />
-                <span v-if="unit" class="absolute inset-x-0 -bottom-0.5 text-center text-[9px] tracking-widest text-muted uppercase">{{ unit }}</span>
-            </div>
-            <button
-                type="button"
-                class="h-14 w-10 touch-manipulation text-2xl font-bold text-muted select-none active:bg-line active:text-ink"
-                @click="bump(1)"
-            >
-                +
-            </button>
+    <div>
+        <label :for="id" class="label">{{ label }}</label>
+        <div class="flex h-16 items-stretch rounded-full bg-soft transition-shadow focus-within:shadow-[inset_0_0_0_2px_var(--color-ink)]">
+            <button type="button" class="press w-12 shrink-0 text-3xl leading-none select-none" :aria-label="`Decrease ${label}`" @click="bump(-1)">−</button>
+            <input
+                :id="id"
+                type="number"
+                inputmode="decimal"
+                :value="modelValue"
+                :placeholder="placeholder"
+                class="w-full min-w-0 bg-transparent text-center text-[1.625rem] font-extrabold tracking-tight outline-none placeholder:font-normal placeholder:text-muted/60"
+                @input="emit('update:modelValue', $event.target.value)"
+                @focus="$event.target.select()"
+            />
+            <button type="button" class="press w-12 shrink-0 text-3xl leading-none select-none" :aria-label="`Increase ${label}`" @click="bump(1)">+</button>
         </div>
     </div>
 </template>

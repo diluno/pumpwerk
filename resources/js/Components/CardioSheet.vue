@@ -1,79 +1,93 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import BottomSheet from './BottomSheet.vue';
 import Stepper from './Stepper.vue';
 
-const props = defineProps({ open: Boolean, sessionId: Number });
+const props = defineProps({
+    open: Boolean,
+    sessionId: Number,
+    // Existing entry to edit; null logs a new one
+    entry: { type: Object, default: null },
+});
 const emit = defineEmits(['close']);
 
-const type = ref('laufband');
 const types = ['laufband', 'crosstrainer', 'bike', 'rowing', 'stairs'];
+const type = ref(types[0]);
 const duration = ref(20);
 const distance = ref(null);
 const paceMin = ref(null);
 const paceSec = ref(null);
+const saving = ref(false);
+
+watch(
+    () => props.open,
+    (open) => {
+        if (!open) return;
+        const e = props.entry;
+        type.value = e?.type ?? type.value;
+        duration.value = e?.duration_minutes ?? 20;
+        distance.value = e?.distance_km ?? null;
+        paceMin.value = e?.pace_seconds ? Math.floor(e.pace_seconds / 60) : null;
+        paceSec.value = e?.pace_seconds ? e.pace_seconds % 60 : null;
+    },
+);
+
+const done = { preserveScroll: true, onSuccess: () => emit('close'), onFinish: () => (saving.value = false) };
 
 function save() {
-    const pace =
-        paceMin.value || paceSec.value
-            ? (parseInt(paceMin.value) || 0) * 60 + (parseInt(paceSec.value) || 0)
-            : null;
-    router.post(
-        `/sessions/${props.sessionId}/cardio`,
-        {
-            type: type.value,
-            duration_minutes: parseFloat(duration.value) || 0,
-            distance_km: distance.value ? parseFloat(distance.value) : null,
-            pace_seconds: pace,
-        },
-        { preserveScroll: true, onSuccess: () => emit('close') },
-    );
+    const hasPace = paceMin.value !== null && paceMin.value !== '';
+    const data = {
+        type: type.value,
+        duration_minutes: parseFloat(duration.value) || 0,
+        distance_km: parseFloat(distance.value) || null,
+        pace_seconds: hasPace || paceSec.value ? (parseInt(paceMin.value) || 0) * 60 + (parseInt(paceSec.value) || 0) : null,
+    };
+    saving.value = true;
+    if (props.entry) {
+        router.patch(`/cardio/${props.entry.id}`, data, done);
+    } else {
+        router.post(`/sessions/${props.sessionId}/cardio`, data, done);
+    }
+}
+
+function remove() {
+    saving.value = true;
+    router.delete(`/cardio/${props.entry.id}`, done);
 }
 </script>
 
 <template>
-    <BottomSheet :open="open" title="Add cardio" @close="emit('close')">
-        <div class="mb-4 flex flex-wrap gap-2">
+    <BottomSheet :open="open" :title="entry ? 'Edit cardio' : 'Add cardio'" @close="emit('close')">
+        <div class="mb-5 flex flex-wrap gap-2" role="radiogroup" aria-label="Cardio type">
             <button
                 v-for="t in types"
                 :key="t"
-                class="rounded-full border px-4 py-2 text-sm font-semibold capitalize"
-                :class="type === t ? 'border-volt bg-volt text-volt-ink' : 'border-line bg-raised text-muted'"
+                role="radio"
+                :aria-checked="type === t"
+                class="press h-11 rounded-full px-4 font-semibold capitalize"
+                :class="type === t ? 'bg-ink text-bg' : 'bg-soft text-ink'"
                 @click="type = t"
             >
                 {{ t }}
             </button>
         </div>
 
-        <div class="mb-4 flex justify-center gap-4">
-            <Stepper v-model="duration" label="Duration" unit="min" :step="5" />
-            <Stepper v-model="distance" label="Distance" unit="km" :step="0.5" />
+        <div class="mb-5 grid grid-cols-2 gap-3">
+            <Stepper v-model="duration" label="Minutes" :step="5" />
+            <Stepper v-model="distance" label="Distance (km)" :step="0.5" placeholder="–" />
         </div>
 
-        <div class="mb-6">
-            <p class="mb-1 text-center text-[10px] font-semibold tracking-widest text-muted uppercase">Pace (per km, optional)</p>
-            <div class="flex items-center justify-center gap-2">
-                <input
-                    v-model="paceMin"
-                    type="number"
-                    inputmode="numeric"
-                    placeholder="mm"
-                    class="font-display w-20 rounded-xl border border-line bg-raised py-3 text-center text-2xl outline-none focus:border-volt"
-                />
-                <span class="font-display text-2xl text-muted">:</span>
-                <input
-                    v-model="paceSec"
-                    type="number"
-                    inputmode="numeric"
-                    placeholder="ss"
-                    class="font-display w-20 rounded-xl border border-line bg-raised py-3 text-center text-2xl outline-none focus:border-volt"
-                />
+        <fieldset class="mb-6">
+            <legend class="label">Pace per km (optional)</legend>
+            <div class="flex items-center gap-2">
+                <input v-model="paceMin" type="number" inputmode="numeric" placeholder="min" aria-label="Pace minutes" class="field !rounded-full text-center text-2xl font-extrabold placeholder:font-normal" />
+                <span class="text-2xl font-extrabold text-muted">:</span>
+                <input v-model="paceSec" type="number" inputmode="numeric" placeholder="sec" aria-label="Pace seconds" class="field !rounded-full text-center text-2xl font-extrabold placeholder:font-normal" />
             </div>
-        </div>
+        </fieldset>
 
-        <button class="font-display w-full rounded-xl bg-volt py-4 text-xl text-volt-ink uppercase active:bg-volt-bright" @click="save">
-            Save cardio
-        </button>
+        <button class="btn-primary w-full" :disabled="saving" @click="save">{{ entry ? 'Save changes' : 'Add cardio' }}</button>
+        <button v-if="entry" class="press mt-2 h-12 w-full font-semibold text-red disabled:opacity-50" :disabled="saving" @click="remove">Delete entry</button>
     </BottomSheet>
 </template>

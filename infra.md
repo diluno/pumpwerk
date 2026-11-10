@@ -65,7 +65,9 @@ Personal workout tracker (Laravel 12 + Inertia/Vue 3). Audited 2026-08-02, re-ve
   tracker; keep for reference.
 - Single-user app: no registration, models not user-scoped (intentional — do not add a second
   account without adding `user_id` scoping). Login user seeded with `APP_USER_EMAIL`.
-- AI endpoints block the request up to 90 s (no queue worker configured); OpenAI errors surface
-  as 502/503 error pages.
+- AI endpoints block the request up to 50 s (no queue worker configured). The server kills requests
+  at 60 s (`request_terminate_timeout` / `max_execution_time` / `fastcgi_read_timeout`, checked
+  2026-11-10), so the timeout in `CoachService` must stay below that. OpenAI errors come back as a
+  `coach` validation error shown as a toast.
 - Production PHP is 8.5, local is 8.4, composer requires `^8.3` — fine, but test locally before
   relying on 8.5-only behavior.

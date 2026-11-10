@@ -11,11 +11,11 @@ class CardioController extends Controller
     private function rules(): array
     {
         return [
-            'type' => 'sometimes|string|max:50',
+            'type' => 'sometimes|required|string|max:50',
             'duration_minutes' => 'required|numeric|min:0|max:1000',
             'pace_seconds' => 'nullable|integer|min:0|max:3600',
             'distance_km' => 'nullable|numeric|min:0|max:1000',
-            'notes' => 'nullable|string',
+            'notes' => 'nullable|string|max:1000',
         ];
     }
 

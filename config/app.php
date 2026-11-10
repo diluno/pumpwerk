@@ -69,6 +69,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Login user
+    |--------------------------------------------------------------------------
+    |
+    | Pumpwerk is single-user. `artisan db:seed` creates or updates this account.
+    | Read through config (not env()) so seeding also works with cached config.
+    |
+    */
+
+    'user' => [
+        'email' => env('APP_USER_EMAIL'),
+        'password' => env('APP_USER_PASSWORD'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

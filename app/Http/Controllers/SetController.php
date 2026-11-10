@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Exercise;
 use App\Models\ExerciseSet;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SetController extends Controller
 {
@@ -36,13 +37,15 @@ class SetController extends Controller
 
     public function destroy(ExerciseSet $set)
     {
-        $exercise = $set->exercise;
-        $set->delete();
+        DB::transaction(function () use ($set) {
+            $exercise = $set->exercise;
+            $set->delete();
 
-        // Renumber remaining sets
-        $exercise->sets()->orderBy('set_number')->get()->each(
-            fn ($s, $i) => $s->update(['set_number' => $i + 1])
-        );
+            // Renumber the remaining sets
+            $exercise->sets()->get()->each(
+                fn ($s, $i) => $s->update(['set_number' => $i + 1])
+            );
+        });
 
         return back();
     }

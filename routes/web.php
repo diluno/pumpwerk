@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\AiFeedbackController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CardioController;
+use App\Http\Controllers\CoachController;
 use App\Http\Controllers\ExerciseController;
 use App\Http\Controllers\MachineController;
 use App\Http\Controllers\ProgressionController;
@@ -25,6 +25,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/sessions/{session}', [SessionController::class, 'destroy'])->name('sessions.destroy');
 
     Route::post('/sessions/{session}/exercises', [ExerciseController::class, 'store'])->name('exercises.store');
+    Route::get('/exercises/{exercise}', [ExerciseController::class, 'show'])->name('exercises.show');
     Route::patch('/exercises/{exercise}', [ExerciseController::class, 'update'])->name('exercises.update');
     Route::delete('/exercises/{exercise}', [ExerciseController::class, 'destroy'])->name('exercises.destroy');
 
@@ -36,11 +37,10 @@ Route::middleware('auth')->group(function () {
     Route::patch('/cardio/{cardio}', [CardioController::class, 'update'])->name('cardio.update');
     Route::delete('/cardio/{cardio}', [CardioController::class, 'destroy'])->name('cardio.destroy');
 
-    Route::get('/machines/picker', [MachineController::class, 'picker'])->name('machines.picker');
     Route::get('/machines/{machine}', [MachineController::class, 'history'])->name('machines.history');
 
     Route::get('/progression', [ProgressionController::class, 'index'])->name('progression');
 
-    Route::post('/sessions/{session}/ai-feedback', [AiFeedbackController::class, 'store'])->name('ai-feedback.store');
-    Route::post('/sessions/{session}/plan', [\App\Http\Controllers\PlanController::class, 'store'])->name('plan.store');
+    Route::post('/sessions/{session}/ai-feedback', [CoachController::class, 'feedback'])->name('ai-feedback.store');
+    Route::post('/sessions/{session}/plan', [CoachController::class, 'plan'])->name('plan.store');
 });

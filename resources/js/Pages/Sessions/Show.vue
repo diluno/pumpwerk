@@ -1,81 +1,88 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
-import ExerciseCard from '../../Components/ExerciseCard.vue';
+import MachineBlock from '../../Components/MachineBlock.vue';
 import MachinePicker from '../../Components/MachinePicker.vue';
 import CardioSheet from '../../Components/CardioSheet.vue';
 import BottomSheet from '../../Components/BottomSheet.vue';
-import { renderMarkdown } from '../../markdown';
+import CoachText from '../../Components/CoachText.vue';
+import { band } from '../../bands.js';
+import { useTween } from '../../motion.js';
+import { formatDate, shortDate, num, volume, paceLabel, plural, setLabel, setsSentence, topWeight } from '../../format.js';
 
-const props = defineProps({ session: Object, lastByMachine: Object, previousFeedback: Object });
-
-const coachOpen = ref(false);
-const planOpen = ref(true);
-const planSheetOpen = ref(false);
-const planNote = ref('');
-const planLoading = ref(false);
-const pickerOpen = ref(false);
-const cardioOpen = ref(false);
-const finishOpen = ref(false);
-const aiLoading = ref(false);
-
-const readonly = computed(() => props.session.finished);
-const usedMachineIds = computed(() => props.session.exercises.map((e) => e.machine_id));
-const totalSets = computed(() => props.session.exercises.reduce((n, e) => n + e.sets.length, 0));
-const totalVolume = computed(() =>
-    Math.round(props.session.exercises.reduce((n, e) => n + e.sets.reduce((m, s) => m + s.weight * s.reps, 0), 0)),
-);
-
-const dateLabel = new Date(props.session.date).toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
+const props = defineProps({
+    session: Object,
+    lastByMachine: Object, // machine id → what was done the previous time
+    previousFeedback: Object, // { date, text } from the latest earlier session | null
+    machines: Array, // picker list (open sessions only)
 });
 
+const url = `/sessions/${props.session.id}`;
+const keep = { preserveScroll: true };
+
+const readonly = computed(() => props.session.finished);
+const exercises = computed(() => props.session.exercises);
+const usedMachineIds = computed(() => exercises.value.map((e) => e.machine_id));
+const totalSets = computed(() => exercises.value.reduce((n, e) => n + e.sets.length, 0));
+const totalVolume = computed(() => Math.round(exercises.value.reduce((n, e) => n + volume(e.sets), 0)));
+const shownVolume = useTween(() => totalVolume.value, 600);
+
+// Each machine as a row: its block, a line about today, and where tapping leads
+const rows = computed(() =>
+    exercises.value.map((e) => {
+        const last = props.lastByMachine[e.machine_id] ?? null;
+        const top = topWeight(e.sets);
+        const lastTop = last ? topWeight(last.sets) : null;
+        let detail = setsSentence(e.sets);
+        if (!e.sets.length) detail = last ? `No sets yet. Last time ${setLabel(last.sets[0])}` : 'No sets yet';
+        else if (readonly.value && lastTop !== null) {
+            detail += top > lastTop ? `. Up from ${num(lastTop)}` : top < lastTop ? `. Down from ${num(lastTop)}` : '';
+        }
+        return {
+            id: e.id,
+            name: e.machine_name,
+            href: readonly.value ? `/machines/${e.machine_id}` : `/exercises/${e.id}`,
+            weight: top ?? lastTop,
+            logged: top !== null,
+            detail,
+            notes: e.notes,
+            volume: volume(e.sets),
+            color: top !== null ? band(top).bg : null,
+        };
+    }),
+);
+// The session as one bar: each machine's share of the weight moved
+const shares = computed(() => rows.value.filter((r) => r.volume > 0));
+
+const pickerOpen = ref(false);
 function addExercise(payload) {
     pickerOpen.value = false;
-    router.post(`/sessions/${props.session.id}/exercises`, payload, { preserveScroll: true });
+    router.post(`${url}/exercises`, payload);
 }
 
-function finish() {
-    router.post(`/sessions/${props.session.id}/finish`);
+const cardioOpen = ref(false);
+const cardioEntry = ref(null);
+function openCardio(entry = null) {
+    cardioEntry.value = entry;
+    cardioOpen.value = true;
 }
 
-function reopen() {
-    router.post(`/sessions/${props.session.id}/reopen`, {}, { preserveScroll: true });
-}
-
-function destroySession() {
-    if (confirm('Delete this whole session?')) {
-        router.delete(`/sessions/${props.session.id}`);
-    }
-}
-
-function removeCardio(c) {
-    router.delete(`/cardio/${c.id}`, { preserveScroll: true });
-}
-
-function generateFeedback() {
-    aiLoading.value = true;
-    router.post(
-        `/sessions/${props.session.id}/ai-feedback`,
-        {},
-        { preserveScroll: true, onFinish: () => (aiLoading.value = false) },
-    );
-}
-
-function saveNotes(e) {
-    router.patch(`/sessions/${props.session.id}`, { notes: e.target.value }, { preserveScroll: true });
-}
+// --- Coach: plan before, feedback after
+const planOpen = ref(totalSets.value === 0);
+const previousOpen = ref(false);
+const planSheetOpen = ref(false);
+const planNote = ref(props.session.plan_prompt ?? '');
+const planLoading = ref(false);
+const feedbackLoading = ref(false);
 
 function generatePlan() {
     planLoading.value = true;
     router.post(
-        `/sessions/${props.session.id}/plan`,
+        `${url}/plan`,
         { note: planNote.value },
         {
-            preserveScroll: true,
+            ...keep,
             onSuccess: () => {
                 planSheetOpen.value = false;
                 planOpen.value = true;
@@ -85,234 +92,236 @@ function generatePlan() {
     );
 }
 
-const paceLabel = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}/km` : null);
+function generateFeedback() {
+    feedbackLoading.value = true;
+    router.post(`${url}/ai-feedback`, {}, { ...keep, onFinish: () => (feedbackLoading.value = false) });
+}
+
+// --- Session itself
+const finishOpen = ref(false);
+const menuOpen = ref(false);
+const confirmDelete = ref(false);
+watch(menuOpen, () => (confirmDelete.value = false));
+
+function saveNotes(e) {
+    if (e.target.value !== (props.session.notes ?? '')) {
+        router.patch(url, { notes: e.target.value }, keep);
+    }
+}
+function saveDate(e) {
+    if (e.target.value && e.target.value !== props.session.date) {
+        router.patch(url, { date: e.target.value }, keep);
+    }
+}
+function finish() {
+    router.post(`${url}/finish`, {}, { viewTransition: true, onSuccess: () => (finishOpen.value = false) });
+}
+function reopen() {
+    menuOpen.value = false;
+    router.post(`${url}/reopen`, {}, { viewTransition: true });
+}
+function destroySession() {
+    if (!confirmDelete.value) return (confirmDelete.value = true);
+    router.delete(url);
+}
+
+const chevron = 'h-5 w-5 shrink-0 transition-transform duration-300';
 </script>
 
 <template>
-    <Head :title="`${session.date} · Pumpwerk`" />
+    <Head :title="formatDate(session.date, { day: 'numeric', month: 'short' })" />
     <AppLayout>
-        <header class="rise-in mb-5">
-            <Link href="/" class="mb-3 inline-flex items-center gap-1 text-sm text-muted active:text-ink">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M15 18l-6-6 6-6" />
+        <div class="flex items-center justify-between">
+            <Link href="/" class="press -ml-1.5 flex h-11 items-center gap-1 pr-2 text-muted">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M15 5l-7 7 7 7" />
                 </svg>
-                All sessions
+                Sessions
             </Link>
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="mb-2 h-1.5 w-12" :class="readonly ? 'bg-line' : 'bg-volt'" />
-                    <h1 class="font-display text-4xl uppercase leading-none">{{ dateLabel }}</h1>
-                </div>
-                <button class="p-2 text-muted active:text-danger" aria-label="Delete session" @click="destroySession">
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                        <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
-                    </svg>
-                </button>
-            </div>
-            <div class="mt-3 flex gap-4 text-sm text-muted">
-                <span><b class="text-ink">{{ session.exercises.length }}</b> machines</span>
-                <span><b class="text-ink">{{ totalSets }}</b> sets</span>
-                <span><b class="text-ink">{{ totalVolume.toLocaleString() }}</b> lb volume</span>
-            </div>
-            <p v-if="readonly" class="mt-3 inline-flex items-center gap-2 rounded-lg bg-raised px-3 py-1.5 text-sm text-muted">
-                Session finished
-                <button class="font-semibold text-volt" @click="reopen">Reopen</button>
-            </p>
-        </header>
-
-        <div class="space-y-4">
-            <!-- Today's plan: generate on demand, optionally steered by a note -->
-            <section v-if="!readonly && session.plan" class="rise-in overflow-hidden rounded-2xl border border-volt bg-volt/10">
-                <button class="flex w-full items-center justify-between px-4 py-3" @click="planOpen = !planOpen">
-                    <span class="font-display text-lg uppercase text-volt">Today's plan</span>
-                    <span class="flex items-center gap-3">
-                        <span
-                            class="rounded-lg px-2 py-1 text-xs font-semibold text-volt/80 underline-offset-2 hover:underline"
-                            @click.stop="planSheetOpen = true"
-                        >
-                            Redo
-                        </span>
-                        <svg
-                            class="h-5 w-5 text-volt transition-transform"
-                            :class="{ 'rotate-180': planOpen }"
-                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                        >
-                            <path d="M6 9l6 6 6-6" />
-                        </svg>
-                    </span>
-                </button>
-                <div v-if="planOpen" class="border-t border-volt/20 px-4 py-3">
-                    <p v-if="session.plan_prompt" class="mb-2 text-xs italic text-muted">"{{ session.plan_prompt }}"</p>
-                    <div
-                        class="space-y-2 text-sm leading-relaxed text-ink/90 [&_strong]:text-volt [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_h3]:font-bold [&_h4]:font-bold [&_h5]:font-bold"
-                        v-html="renderMarkdown(session.plan)"
-                    />
-                </div>
-            </section>
-            <button
-                v-else-if="!readonly"
-                class="rise-in flex w-full items-center justify-center gap-2 rounded-2xl border border-volt/50 py-3.5 font-semibold text-volt active:bg-volt/10"
-                @click="planSheetOpen = true"
-            >
-                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M13 2L4.09 12.11a.6.6 0 0 0 .45 1h5.96l-1.5 8.89L18.91 11.9a.6.6 0 0 0-.45-1h-5.96z" />
+            <button class="press -mr-2 grid h-11 w-11 place-items-center rounded-full active:bg-soft" aria-label="Session options" @click="menuOpen = true">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
                 </svg>
-                Plan today's session
             </button>
+        </div>
 
-            <section
-                v-if="previousFeedback"
-                class="rise-in overflow-hidden rounded-2xl border border-volt/40 bg-volt/5"
-            >
-                <button class="flex w-full items-center justify-between px-4 py-3" @click="coachOpen = !coachOpen">
-                    <span class="font-display text-lg uppercase text-volt">Coach's plan · {{ previousFeedback.date }}</span>
-                    <svg
-                        class="h-5 w-5 text-volt transition-transform"
-                        :class="{ 'rotate-180': coachOpen }"
-                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                    >
-                        <path d="M6 9l6 6 6-6" />
-                    </svg>
-                </button>
-                <div
-                    v-if="coachOpen"
-                    class="space-y-2 border-t border-volt/20 px-4 py-3 text-sm leading-relaxed text-ink/90 [&_strong]:text-volt [&_ul]:list-disc [&_ul]:pl-5 [&_h3]:font-bold [&_h4]:font-bold [&_h5]:font-bold"
-                    v-html="renderMarkdown(previousFeedback.text)"
-                />
-            </section>
+        <h1 class="display mt-0.5 text-[2.625rem]" :style="{ viewTransitionName: `session-${session.id}` }">
+            {{ formatDate(session.date, { weekday: 'long' }) }}<br />{{ formatDate(session.date, { day: 'numeric', month: 'long' }) }}
+        </h1>
+        <p class="mt-2 text-muted">
+            <template v-if="readonly">Finished. </template>
+            <template v-if="exercises.length || session.cardio.length">
+                {{ plural(exercises.length, 'machine') }}, {{ plural(totalSets, 'set') }},
+                <span class="tabular-nums">{{ num(Math.round(shownVolume)) }}</span> lb moved<template v-if="session.cardio.length">, cardio</template>
+            </template>
+            <template v-else>{{ readonly ? 'Nothing was logged.' : 'Nothing logged yet.' }}</template>
+        </p>
 
-            <ExerciseCard
-                v-for="e in session.exercises"
-                :key="e.id"
-                :exercise="e"
-                :last="lastByMachine[e.machine_id] ?? null"
-                :readonly="readonly"
+        <div
+            v-if="shares.length"
+            class="mt-3.5 flex h-3.5 gap-[3px]"
+            role="img"
+            :aria-label="`Share of weight moved: ${shares.map((s) => s.name).join(', ')}`"
+        >
+            <span
+                v-for="(s, i) in shares"
+                :key="s.id"
+                class="grow-x rounded-full transition-[flex-grow] duration-700 ease-out-soft"
+                :style="{ flexGrow: s.volume, flexBasis: 0, backgroundColor: s.color, '--i': i }"
             />
+        </div>
 
-            <section v-if="session.cardio.length" class="rise-in overflow-hidden rounded-2xl border border-line bg-surface">
-                <header class="border-b border-line px-4 py-3">
-                    <h2 class="font-display text-xl uppercase">Cardio</h2>
-                </header>
-                <ul>
-                    <li v-for="c in session.cardio" :key="c.id" class="flex items-center gap-3 border-b border-line/60 px-4 py-2.5">
-                        <span class="flex-1 font-semibold capitalize">{{ c.type }}</span>
-                        <span class="font-display text-xl">{{ c.duration_minutes }}<span class="text-xs text-muted">min</span></span>
-                        <span v-if="c.distance_km" class="font-display text-xl">{{ c.distance_km }}<span class="text-xs text-muted">km</span></span>
-                        <span v-if="c.pace_seconds" class="text-sm text-muted">{{ paceLabel(c.pace_seconds) }}</span>
-                        <button v-if="!readonly" class="p-1.5 text-muted active:text-danger" aria-label="Delete cardio" @click="removeCardio(c)">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                                <path d="M6 6l12 12M18 6L6 18" />
-                            </svg>
-                        </button>
-                    </li>
-                </ul>
-            </section>
-
-            <div v-if="!readonly" class="grid grid-cols-2 gap-3">
-                <button
-                    class="rounded-2xl border-2 border-dashed border-line py-4 font-semibold text-muted active:border-volt active:text-volt"
-                    @click="pickerOpen = true"
-                >
-                    + Machine
-                </button>
-                <button
-                    class="rounded-2xl border-2 border-dashed border-line py-4 font-semibold text-muted active:border-volt active:text-volt"
-                    @click="cardioOpen = true"
-                >
-                    + Cardio
-                </button>
-            </div>
-
-            <section class="rise-in rounded-2xl border border-line bg-surface px-4 py-3">
-                <h2 class="mb-2 text-[11px] font-bold tracking-widest text-muted uppercase">Session notes</h2>
-                <textarea
-                    :value="session.notes"
-                    :disabled="readonly"
-                    rows="2"
-                    placeholder="How did it go?"
-                    class="w-full resize-none bg-transparent text-sm outline-none placeholder:text-muted/60"
-                    @change="saveNotes"
-                />
-            </section>
-
-            <section class="rise-in rounded-2xl border border-line bg-surface px-4 py-4">
-                <div class="mb-2 flex items-center justify-between">
-                    <h2 class="font-display text-xl uppercase">Coach</h2>
-                    <button
-                        class="rounded-lg bg-raised px-3 py-1.5 text-sm font-semibold text-volt active:bg-line disabled:opacity-50"
-                        :disabled="aiLoading"
-                        @click="generateFeedback"
-                    >
-                        {{ aiLoading ? 'Thinking…' : session.ai_feedback ? 'Regenerate' : 'Get feedback' }}
+        <div class="mt-4 space-y-2">
+            <!-- After the session: coach feedback leads -->
+            <section v-if="readonly || session.ai_feedback" class="rise rounded-[1.75rem] bg-ink px-5 py-[1.125rem] text-bg">
+                <div class="flex items-baseline justify-between gap-3">
+                    <h2 class="text-[1.375rem] font-extrabold tracking-tight">Coach feedback</h2>
+                    <button v-if="session.ai_feedback && !feedbackLoading" class="press -my-3 -mr-2 min-h-11 px-2 text-[0.9375rem] text-faint" @click="generateFeedback">
+                        Ask again
                     </button>
                 </div>
-                <div
-                    v-if="session.ai_feedback"
-                    class="prose-sm space-y-2 text-sm leading-relaxed text-ink/90 [&_strong]:text-volt [&_ul]:list-disc [&_ul]:pl-5 [&_h1]:font-bold [&_h2]:font-bold [&_h3]:font-bold"
-                    v-html="renderMarkdown(session.ai_feedback)"
-                />
-                <p v-else class="text-sm text-muted">Get AI analysis of this session and suggested weights for next time.</p>
+                <p v-if="feedbackLoading" class="breathe mt-2 text-faint" role="status">Reading your session and recent history. This can take up to a minute.</p>
+                <CoachText v-else-if="session.ai_feedback" :text="session.ai_feedback" class="mt-2.5" />
+                <template v-else>
+                    <p class="mt-1 mb-4 text-faint">What went well, what to watch, and target weights for next time.</p>
+                    <button class="btn w-full bg-bg text-xl font-extrabold text-ink" :disabled="!totalSets && !session.cardio.length" @click="generateFeedback">
+                        Get feedback
+                    </button>
+                </template>
             </section>
+
+            <!-- Before and during: today's plan, steered by an optional note -->
+            <template v-if="!readonly">
+                <section v-if="session.plan" class="rounded-[1.75rem] bg-soft">
+                    <button class="flex h-[3.375rem] w-full items-center justify-between px-[1.125rem] text-left font-semibold" :aria-expanded="planOpen" @click="planOpen = !planOpen">
+                        Today’s plan from the coach
+                        <svg :class="[chevron, { 'rotate-180': planOpen }]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M6 9l6 6 6-6" />
+                        </svg>
+                    </button>
+                    <Transition name="unfold">
+                        <div v-if="planOpen" class="unfold">
+                            <div>
+                                <div class="px-[1.125rem] pb-2">
+                                    <p v-if="session.plan_prompt" class="mb-2 text-[0.9375rem] text-muted">You asked: “{{ session.plan_prompt }}”</p>
+                                    <CoachText :text="session.plan" />
+                                    <button class="press mt-1 -ml-2 min-h-11 px-2 text-[0.9375rem] font-semibold underline underline-offset-4" @click="planSheetOpen = true">Change plan</button>
+                                </div>
+                            </div>
+                        </div>
+                    </Transition>
+                </section>
+                <button v-else class="btn-soft w-full justify-between !px-[1.125rem]" @click="planSheetOpen = true">
+                    Plan today with the coach
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 5l7 7-7 7" />
+                    </svg>
+                </button>
+
+                <section v-if="previousFeedback" class="rounded-[1.75rem] bg-soft">
+                    <button class="flex h-[3.375rem] w-full items-center justify-between gap-3 px-[1.125rem] text-left font-semibold" :aria-expanded="previousOpen" @click="previousOpen = !previousOpen">
+                        Coach feedback from {{ shortDate(previousFeedback.date) }}
+                        <svg :class="[chevron, { 'rotate-180': previousOpen }]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M6 9l6 6 6-6" />
+                        </svg>
+                    </button>
+                    <Transition name="unfold">
+                        <div v-if="previousOpen" class="unfold">
+                            <div><CoachText :text="previousFeedback.text" class="px-[1.125rem] pb-4" /></div>
+                        </div>
+                    </Transition>
+                </section>
+            </template>
+
+            <!-- One row per machine. Solid block: today's weight. Pale: nothing logged yet, showing last time's. -->
+            <Link
+                v-for="(r, i) in rows"
+                :key="r.id"
+                :href="r.href"
+                class="card press rise flex items-center gap-3.5 py-2 pr-3.5 pl-2"
+                :style="{ '--i': i }"
+            >
+                <MachineBlock :weight="r.weight" :logged="r.logged" />
+                <span class="min-w-0 flex-1">
+                    <span class="block text-xl font-extrabold tracking-tight" :style="{ viewTransitionName: readonly ? null : `machine-${r.id}` }">{{ r.name }}</span>
+                    <span class="block text-[0.9375rem] text-muted">{{ r.detail }}</span>
+                    <span v-if="r.notes" class="block truncate text-[0.9375rem] text-muted italic">{{ r.notes }}</span>
+                </span>
+                <svg class="h-5 w-5 shrink-0 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 5l7 7-7 7" />
+                </svg>
+            </Link>
+
+            <component
+                :is="readonly ? 'div' : 'button'"
+                v-for="c in session.cardio"
+                :key="`c${c.id}`"
+                class="card flex w-full items-center gap-3.5 py-2 pr-3.5 pl-2 text-left"
+                :class="{ press: !readonly }"
+                :aria-label="readonly ? null : `Edit ${c.type}`"
+                @click="!readonly && openCardio(c)"
+            >
+                <span class="grid h-[3.75rem] w-[4.25rem] shrink-0 place-items-center rounded-[1.375rem] bg-soft text-xl leading-none font-extrabold">
+                    <span>{{ num(c.duration_minutes) }}<span class="block text-[0.8125rem] font-normal text-muted">min</span></span>
+                </span>
+                <span class="min-w-0 flex-1">
+                    <span class="block text-xl font-extrabold tracking-tight capitalize">{{ c.type }}</span>
+                    <span class="block text-[0.9375rem] text-muted">
+                        {{ [c.distance_km && `${num(c.distance_km)} km`, paceLabel(c.pace_seconds)].filter(Boolean).join(' at ') || 'Cardio' }}
+                    </span>
+                </span>
+            </component>
+
+            <div v-if="!readonly" class="grid grid-cols-2 gap-2">
+                <button :class="exercises.length ? 'btn-soft' : 'btn-primary'" @click="pickerOpen = true">Add machine</button>
+                <button class="btn-soft" @click="openCardio()">Add cardio</button>
+            </div>
         </div>
 
-        <!-- Spacer so content can scroll clear of the floating finish bar -->
-        <div v-if="!readonly" class="h-20" />
+        <section v-if="!readonly || session.notes" class="mt-5">
+            <label for="notes" class="label">Session notes</label>
+            <p v-if="readonly" class="whitespace-pre-line">{{ session.notes }}</p>
+            <textarea v-else id="notes" :value="session.notes" rows="2" maxlength="5000" placeholder="Energy, sleep, anything the coach should know" class="field resize-none !text-base" @change="saveNotes" />
+        </section>
 
-        <!-- Deliberate finish flow: separate action with summary confirmation -->
-        <div
-            v-if="!readonly"
-            class="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.2rem)] z-30 mx-auto max-w-lg px-4"
-        >
-            <button
-                class="font-display w-full rounded-xl border border-line bg-raised/95 py-3 text-lg uppercase tracking-wide backdrop-blur active:border-volt"
-                @click="finishOpen = true"
-            >
-                Finish session
-            </button>
-        </div>
+        <button v-if="!readonly" class="btn-primary mt-5 w-full h-[3.75rem]" @click="finishOpen = true">Finish session</button>
+        <button v-else class="press mx-auto mt-3 block min-h-11 px-4 text-[0.9375rem] text-muted" @click="reopen">Reopen to add or change sets</button>
 
-        <BottomSheet :open="planSheetOpen" title="Plan today" @close="planSheetOpen = false">
-            <p class="mb-3 text-sm text-muted">
-                The coach looks at your recent sessions and drafts today's machines, weights and reps.
-                Anything it should know?
-            </p>
-            <textarea
-                v-model="planNote"
-                rows="3"
-                placeholder="Optional — e.g. my knee hurts, plan around it / short on time, 30 min only / focus on upper body"
-                class="mb-4 w-full resize-none rounded-xl border border-line bg-raised px-4 py-3 text-sm outline-none placeholder:text-muted/60 focus:border-volt"
-            />
-            <button
-                class="font-display w-full rounded-xl bg-volt py-4 text-xl text-volt-ink uppercase active:bg-volt-bright disabled:opacity-60"
-                :disabled="planLoading"
-                @click="generatePlan"
-            >
-                {{ planLoading ? 'Thinking…' : session.plan ? 'Regenerate plan' : 'Generate plan' }}
+        <!-- Sheets -->
+        <MachinePicker :open="pickerOpen" :machines="machines" :used-machine-ids="usedMachineIds" @close="pickerOpen = false" @pick="addExercise" />
+        <CardioSheet :open="cardioOpen" :session-id="session.id" :entry="cardioEntry" @close="cardioOpen = false" />
+
+        <BottomSheet :open="planSheetOpen" :title="session.plan ? 'Change plan' : 'Plan today'" @close="planSheetOpen = false">
+            <label for="plan-note" class="mb-3 block text-muted">
+                The coach reads your recent sessions and drafts today’s machines, weights and reps. Anything it should work around?
+            </label>
+            <textarea id="plan-note" v-model="planNote" rows="3" maxlength="1000" placeholder="Optional: knee hurts, only 30 minutes, upper body today…" class="field mb-4 resize-none !text-base" />
+            <button class="btn-primary w-full" :disabled="planLoading" @click="generatePlan">
+                <span :class="{ breathe: planLoading }">{{ planLoading ? 'Planning…' : session.plan ? 'Make a new plan' : 'Make a plan' }}</span>
             </button>
+            <p v-if="planLoading" class="mt-3 text-center text-sm text-muted" role="status">This can take up to a minute.</p>
         </BottomSheet>
 
-        <MachinePicker :open="pickerOpen" :used-machine-ids="usedMachineIds" @close="pickerOpen = false" @pick="addExercise" />
-        <CardioSheet :open="cardioOpen" :session-id="session.id" @close="cardioOpen = false" />
-
         <BottomSheet :open="finishOpen" title="Finish session?" @close="finishOpen = false">
-            <ul class="mb-4 space-y-1 text-sm text-muted">
-                <li><b class="text-ink">{{ session.exercises.length }}</b> machines · <b class="text-ink">{{ totalSets }}</b> sets · <b class="text-ink">{{ totalVolume.toLocaleString() }}</b> lb</li>
-                <li v-if="session.cardio.length"><b class="text-ink">{{ session.cardio.length }}</b> cardio {{ session.cardio.length === 1 ? 'entry' : 'entries' }}</li>
-            </ul>
-
-            <div v-if="!session.cardio.length" class="mb-4 rounded-xl border border-volt/50 bg-volt/10 px-4 py-3 text-sm">
-                No cardio logged yet.
-                <button class="font-bold text-volt" @click="finishOpen = false; cardioOpen = true">Add cardio first →</button>
-            </div>
-
+            <p class="mb-4 text-lg">
+                {{ plural(exercises.length, 'machine') }}, {{ plural(totalSets, 'set') }}, {{ num(totalVolume) }} lb moved<template v-if="session.cardio.length">, cardio</template>
+            </p>
+            <button v-if="!session.cardio.length" class="press mb-4 w-full rounded-3xl bg-soft px-5 py-3.5 text-left" @click="finishOpen = false; openCardio()">
+                No cardio logged. <span class="font-semibold underline underline-offset-4">Add cardio first</span>
+            </button>
             <div class="grid grid-cols-2 gap-3">
-                <button class="rounded-xl border border-line py-3.5 font-semibold text-muted" @click="finishOpen = false">
-                    Keep going
-                </button>
-                <button class="font-display rounded-xl bg-volt py-3.5 text-lg text-volt-ink uppercase" @click="finish">
-                    Finish
-                </button>
+                <button class="btn-soft" @click="finishOpen = false">Keep going</button>
+                <button class="btn-primary" @click="finish">Finish</button>
             </div>
+        </BottomSheet>
+
+        <BottomSheet :open="menuOpen" title="Session" @close="menuOpen = false">
+            <label for="session-date" class="label">Date</label>
+            <input id="session-date" type="date" :value="session.date" class="field mb-4" @change="saveDate" />
+            <button v-if="readonly" class="btn-soft mb-3 w-full" @click="reopen">Reopen session</button>
+            <button class="btn w-full" :class="confirmDelete ? 'bg-red text-white' : 'text-red shadow-[inset_0_0_0_1.5px_var(--color-red)]'" @click="destroySession">
+                {{ confirmDelete ? 'Tap again to delete everything in it' : 'Delete session' }}
+            </button>
         </BottomSheet>
     </AppLayout>
 </template>

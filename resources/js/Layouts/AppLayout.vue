@@ -1,51 +1,74 @@
 <script setup>
-import { Link, usePage, router } from '@inertiajs/vue3';
+import { ref, computed, watch } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
+import { startSession } from '../session.js';
+
+// `nav: false` gives a screen the whole height (the machine screen)
+defineProps({ nav: { type: Boolean, default: true } });
 
 const page = usePage();
-const isActive = (path) =>
-    path === '/' ? page.url === '/' : page.url.startsWith(path);
+const activeSessionId = computed(() => page.props.activeSessionId);
+
+const tab = computed(() => {
+    const url = page.url;
+    if (url.startsWith('/progression') || url.startsWith('/machines')) return 'progress';
+    if (activeSessionId.value && (url.startsWith(`/sessions/${activeSessionId.value}`) || url.startsWith('/exercises'))) return 'today';
+    return 'sessions';
+});
+
+// Anything the server rejected (validation, coach failures) surfaces here.
+const error = ref(null);
+let timer;
+watch(
+    () => page.props.errors,
+    (errors) => {
+        clearTimeout(timer);
+        error.value = Object.values(errors ?? {})[0] ?? null;
+        if (error.value) timer = setTimeout(() => (error.value = null), 8000);
+    },
+    { immediate: true },
+);
+
+const item = 'press flex h-[2.875rem] items-center justify-center gap-2 rounded-full';
+const on = 'bg-ink font-semibold text-bg';
 </script>
 
 <template>
     <div class="mx-auto flex min-h-dvh max-w-lg flex-col">
-        <main class="flex-1 px-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-28">
+        <Transition name="toast">
+            <div v-if="error" role="alert" class="fixed inset-x-0 top-0 z-[60] mx-auto max-w-lg px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+                <button class="w-full rounded-3xl bg-red px-5 py-3.5 text-left text-white shadow-[0_10px_30px_rgb(217_45_32/0.35)]" @click="error = null">
+                    <span class="font-extrabold">Didn’t work.</span> {{ error }}
+                </button>
+            </div>
+        </Transition>
+
+        <main class="flex-1 px-5 pt-[calc(env(safe-area-inset-top)+0.75rem)]" :class="nav ? 'pb-28' : 'pb-[calc(env(safe-area-inset-bottom)+1.25rem)]'">
             <slot />
         </main>
 
         <nav
-            class="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur"
+            v-if="nav"
+            aria-label="Main"
+            class="vt-nav fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/92 backdrop-blur"
             style="padding-bottom: env(safe-area-inset-bottom)"
         >
-            <div class="mx-auto grid max-w-lg grid-cols-3">
+            <div class="mx-auto grid max-w-lg grid-cols-3 gap-1 px-3 pt-2 pb-2.5">
+                <Link href="/" :class="[item, tab === 'sessions' ? on : 'text-muted']" :aria-current="tab === 'sessions' ? 'page' : null">Sessions</Link>
+
+                <!-- Jumps back into the session being logged, or starts today's -->
                 <Link
-                    href="/"
-                    class="flex flex-col items-center gap-0.5 py-3 text-[11px] font-semibold tracking-widest uppercase"
-                    :class="isActive('/') || isActive('/sessions') ? 'text-volt' : 'text-muted'"
+                    v-if="activeSessionId"
+                    :href="`/sessions/${activeSessionId}`"
+                    :class="[item, tab === 'today' ? on : 'font-semibold text-ink']"
+                    :aria-current="tab === 'today' ? 'page' : null"
                 >
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                        <path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11" />
-                    </svg>
-                    Sessions
+                    <span v-if="tab !== 'today'" class="breathe h-2 w-2 rounded-full bg-red" aria-hidden="true" />
+                    In progress
                 </Link>
-                <Link
-                    href="/progression"
-                    class="flex flex-col items-center gap-0.5 py-3 text-[11px] font-semibold tracking-widest uppercase"
-                    :class="isActive('/progression') ? 'text-volt' : 'text-muted'"
-                >
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 20h18M5 16l4-5 4 3 6-8" />
-                    </svg>
-                    Progress
-                </Link>
-                <button
-                    class="flex flex-col items-center gap-0.5 py-3 text-[11px] font-semibold tracking-widest uppercase text-muted"
-                    @click="router.post('/logout')"
-                >
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-                    </svg>
-                    Out
-                </button>
+                <button v-else :class="[item, 'text-muted']" @click="startSession">Start session</button>
+
+                <Link href="/progression" :class="[item, tab === 'progress' ? on : 'text-muted']" :aria-current="tab === 'progress' ? 'page' : null">Progress</Link>
             </div>
         </nav>
     </div>

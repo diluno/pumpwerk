@@ -1,26 +1,31 @@
 @import 'tailwindcss';
-@import '@fontsource/anton';
-@import '@fontsource/barlow/400.css';
-@import '@fontsource/barlow/500.css';
-@import '@fontsource/barlow/600.css';
-@import '@fontsource/barlow/700.css';
+@import '@fontsource-variable/bricolage-grotesque/opsz.css';
 
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
-    --font-display: 'Anton', 'Barlow', sans-serif;
+    --font-sans: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
 
-    --color-bg: #101110;
-    --color-surface: #1a1c19;
-    --color-raised: #23261f;
-    --color-line: #2e332b;
-    --color-ink: #edefea;
-    --color-muted: #8a9086;
-    --color-volt: #c8f542;
-    --color-volt-bright: #d9ff57;
-    --color-volt-ink: #151705;
-    --color-danger: #ff6b5e;
+    --color-bg: #fafaf7;
+    --color-card: #ffffff;
+    --color-soft: #ecece6;
+    --color-line: #deded7;
+    --color-ink: #15151b;
+    --color-muted: #55555e;
+    --color-faint: #d5d5ce; /* secondary text on ink */
+
+    /* Weight bands, light to heavy. Keep in sync with resources/js/bands.js */
+    --color-green: #15803d;
+    --color-green-pale: #ddf0e3;
+    --color-yellow: #f5b800;
+    --color-yellow-pale: #fcf0c4;
+    --color-blue: #2456e6;
+    --color-blue-pale: #dfe7fc;
+    --color-red: #d92d20;
+    --color-red-pale: #fadfdc;
+
+    --ease-spring: cubic-bezier(0.3, 1.35, 0.5, 1);
+    --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html {
@@ -31,21 +36,23 @@ html {
 
 body {
     min-height: 100dvh;
-    /* subtle industrial texture: faint diagonal hatch */
-    background-image: repeating-linear-gradient(
-        -45deg,
-        transparent 0,
-        transparent 11px,
-        rgb(255 255 255 / 0.012) 11px,
-        rgb(255 255 255 / 0.012) 12px
-    );
+    font-size: 1rem;
 }
 
-.font-display {
-    letter-spacing: 0.01em;
+button,
+a {
+    touch-action: manipulation;
 }
 
-/* Big numeric inputs: kill spinners */
+:focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+}
+input:focus-visible,
+textarea:focus-visible {
+    outline: none;
+}
+
 input[type='number']::-webkit-outer-spin-button,
 input[type='number']::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -56,68 +63,326 @@ input[type='number'] {
     appearance: textfield;
 }
 
-@keyframes rise-in {
+@layer components {
+    .display {
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        line-height: 1;
+    }
+
+    /* Everything pressable gives a little under the thumb */
+    .press,
+    .btn,
+    .btn-primary,
+    .btn-soft,
+    .btn-danger {
+        transition:
+            transform 0.18s var(--ease-spring),
+            background-color 0.2s ease,
+            color 0.2s ease,
+            opacity 0.2s ease;
+    }
+    .press:active,
+    .btn:active,
+    .btn-primary:active,
+    .btn-soft:active,
+    .btn-danger:active {
+        transform: scale(0.96);
+    }
+
+    .btn,
+    .btn-primary,
+    .btn-soft,
+    .btn-danger {
+        @apply flex h-14 items-center justify-center rounded-full px-5 text-center font-semibold disabled:opacity-50;
+    }
+    .btn-primary {
+        @apply bg-ink text-xl font-extrabold text-bg;
+    }
+    .btn-soft {
+        @apply bg-soft text-ink;
+    }
+    .btn-danger {
+        @apply bg-red text-white;
+    }
+
+    .card {
+        @apply rounded-[1.75rem] bg-card;
+        box-shadow: inset 0 0 0 1px var(--color-line);
+    }
+
+    .field {
+        @apply w-full rounded-3xl border border-line bg-card px-4 py-3.5 text-lg outline-none transition-colors placeholder:text-muted/70 focus:border-ink;
+    }
+
+    .label {
+        @apply mb-1.5 block text-sm text-muted;
+    }
+}
+
+/* ---------------------------------------------------------------- Motion */
+
+/* Page changes (Inertia view transitions): the old page sinks back, the new one rises in */
+::view-transition-old(root) {
+    animation: page-out 0.16s ease both;
+}
+::view-transition-new(root) {
+    animation: page-in 0.38s var(--ease-out-soft) both;
+}
+@keyframes page-out {
+    to {
+        opacity: 0;
+        transform: scale(0.985);
+    }
+}
+@keyframes page-in {
     from {
         opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
+        transform: translateY(18px);
     }
 }
-.rise-in {
-    animation: rise-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+/* The tab bar stays put while pages change underneath */
+.vt-nav {
+    view-transition-name: nav;
+}
+::view-transition-group(*) {
+    animation-duration: 0.36s;
+    animation-timing-function: var(--ease-out-soft);
 }
 
-@keyframes sheet-up {
+/* Bottom sheets */
+.sheet-enter-active,
+.sheet-leave-active {
+    transition: opacity 0.22s ease;
+}
+.sheet-enter-active .sheet-panel {
+    transition: transform 0.42s var(--ease-out-soft);
+}
+.sheet-leave-active .sheet-panel {
+    transition: transform 0.2s ease-in;
+}
+.sheet-enter-from,
+.sheet-leave-to {
+    opacity: 0;
+}
+.sheet-enter-from .sheet-panel,
+.sheet-leave-to .sheet-panel {
+    transform: translateY(100%);
+}
+
+.toast-enter-active,
+.toast-leave-active {
+    transition:
+        opacity 0.2s ease,
+        transform 0.3s var(--ease-spring);
+}
+.toast-enter-from,
+.toast-leave-to {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+}
+
+/* Things that pop into a list: logged sets, new rows */
+.pop-enter-active {
+    transition:
+        transform 0.4s var(--ease-spring),
+        opacity 0.2s ease;
+}
+.pop-leave-active {
+    transition:
+        transform 0.18s ease,
+        opacity 0.18s ease;
+    position: absolute;
+}
+.pop-enter-from,
+.pop-leave-to {
+    opacity: 0;
+    transform: scale(0.6);
+}
+.pop-move {
+    transition: transform 0.3s var(--ease-out-soft);
+}
+
+/* Expanding panels */
+.unfold-enter-active,
+.unfold-leave-active {
+    transition:
+        grid-template-rows 0.34s var(--ease-out-soft),
+        opacity 0.25s ease;
+}
+.unfold {
+    display: grid;
+    grid-template-rows: 1fr;
+}
+.unfold > * {
+    overflow: hidden;
+    min-height: 0;
+}
+.unfold-enter-from,
+.unfold-leave-to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+}
+
+/* Bars that grow from nothing, staggered by --i */
+@keyframes grow-x {
     from {
-        transform: translateY(100%);
-    }
-    to {
-        transform: translateY(0);
+        transform: scaleX(0);
     }
 }
-.sheet-up {
-    animation: sheet-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes flash-volt {
-    0% {
-        background-color: rgb(200 245 66 / 0.25);
-    }
-    100% {
-        background-color: transparent;
+@keyframes grow-y {
+    from {
+        transform: scaleY(0);
     }
 }
-.flash-volt {
-    animation: flash-volt 0.9s ease-out both;
+.grow-x {
+    transform-origin: left center;
+    animation: grow-x 0.5s var(--ease-out-soft) both;
+    animation-delay: calc(var(--i, 0) * 45ms + 120ms);
+}
+.grow-y {
+    transform-origin: center bottom;
+    animation: grow-y 0.55s var(--ease-spring) both;
+    animation-delay: calc(var(--i, 0) * 28ms + 80ms);
 }
 
-/* Markdown tables from AI feedback */
+/* Rows that arrive one after the other */
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+}
+.rise {
+    animation: rise 0.45s var(--ease-out-soft) both;
+    animation-delay: calc(var(--i, 0) * 40ms + 60ms);
+}
+
+/* The weight stack */
+.plate {
+    transition:
+        height 0.34s var(--ease-spring),
+        border-radius 0.34s ease,
+        background-color 0.22s ease,
+        color 0.22s ease,
+        transform 0.18s var(--ease-spring);
+}
+.plate:active {
+    transform: scale(0.98);
+}
+.plate-move {
+    transition: transform 0.34s var(--ease-out-soft);
+}
+.plate-enter-active,
+.plate-leave-active {
+    transition: opacity 0.2s ease;
+}
+.plate-leave-active {
+    position: absolute;
+    left: 0;
+    right: 0;
+}
+.plate-enter-from,
+.plate-leave-to {
+    opacity: 0;
+}
+.pin {
+    transition: top 0.34s var(--ease-spring);
+}
+/* One rep: the plates on the stack rise and drop when a set is logged */
+@keyframes lift {
+    35% {
+        transform: translateY(-9px);
+    }
+    70% {
+        transform: translateY(2px);
+    }
+}
+.lifting .plate-on {
+    animation: lift 0.5s var(--ease-out-soft);
+}
+.lifting .pin {
+    animation: lift 0.5s var(--ease-out-soft);
+}
+
+@keyframes breathe {
+    50% {
+        opacity: 0.45;
+    }
+}
+.breathe {
+    animation: breathe 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-delay: 0s !important;
+        transition-duration: 0.01ms !important;
+    }
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+        animation: none !important;
+    }
+}
+
+/* ------------------------------------------- Rendered coach markdown */
+.coach-prose {
+    line-height: 1.5;
+}
+.coach-prose > * + * {
+    margin-top: 0.65rem;
+}
+.coach-prose h3,
+.coach-prose h4,
+.coach-prose h5,
+.coach-prose h6 {
+    font-weight: 700;
+    font-size: 1.0625rem;
+}
+.coach-prose > h3:not(:first-child),
+.coach-prose > h4:not(:first-child) {
+    margin-top: 1.1rem;
+}
+.coach-prose strong {
+    font-weight: 700;
+}
+.coach-prose ul,
+.coach-prose ol {
+    padding-left: 1.25rem;
+}
+.coach-prose ul {
+    list-style: disc;
+}
+.coach-prose ol {
+    list-style: decimal;
+}
+.coach-prose li + li {
+    margin-top: 0.3rem;
+}
+.coach-prose li::marker {
+    opacity: 0.6;
+}
 .table-scroll {
     overflow-x: auto;
-    margin: 0.25rem 0;
-    border: 1px solid var(--color-line);
-    border-radius: 0.75rem;
+    border-radius: 1rem;
+    box-shadow: inset 0 0 0 1px currentColor;
 }
 .table-scroll table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     white-space: nowrap;
 }
 .table-scroll th {
     text-align: left;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 0.7rem;
-    color: var(--color-muted);
-    background: var(--color-raised);
     padding: 0.5rem 0.75rem;
 }
 .table-scroll td {
     padding: 0.45rem 0.75rem;
-    border-top: 1px solid var(--color-line);
+    border-top: 1px solid color-mix(in srgb, currentColor 25%, transparent);
 }
