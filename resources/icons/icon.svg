@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Pumpwerk app icon: the weight stack. Three plates and the pinned one.
+       Full-bleed square; everything sits inside the maskable safe zone.
+       Regenerate the PNGs with resources/icons/build.sh -->
+  <rect width="512" height="512" fill="#fafaf7"/>
+  <rect x="116" y="107" width="256" height="46" rx="23" fill="#15803d"/>
+  <rect x="116" y="167" width="256" height="46" rx="23" fill="#f5b800"/>
+  <rect x="116" y="227" width="256" height="46" rx="23" fill="#2456e6"/>
+  <rect x="116" y="287" width="256" height="118" rx="42" fill="#d92d20"/>
+  <circle cx="372" cy="346" r="46" fill="#fafaf7"/>
+  <circle cx="372" cy="346" r="34" fill="#15151b"/>
+</svg>

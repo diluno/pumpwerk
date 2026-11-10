@@ -6,7 +6,9 @@
     <meta name="theme-color" content="#fafaf7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="apple-touch-icon" href="/icons/icon-180.png">
     <link rel="manifest" href="/build/manifest.webmanifest">
     <title inertia>Pumpwerk</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
