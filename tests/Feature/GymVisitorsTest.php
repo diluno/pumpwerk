@@ -67,6 +67,27 @@ class GymVisitorsTest extends TestCase
         Http::assertSentCount(8);
     }
 
+    public function test_closed_gyms_are_not_asked(): void
+    {
+        Http::fake(['www.fitnesspark.ch/*' => Http::response('12')]);
+        $gyms = app(GymService::class);
+
+        // Tuesday 05:10 UTC is 06:10 in Zurich: Sihlcity opens at 06:30, the others at 06:00
+        Carbon::setTestNow('2026-11-10 05:10:00');
+        $this->assertSame(3, $gyms->poll());
+        $sihlcity = $gyms->current()->firstWhere('key', 'sihlcity');
+        $this->assertSame([false, '06:30', null], [$sihlcity['open'], $sihlcity['opens'], $sihlcity['visitors']]);
+
+        // Saturday 20:30 in Zurich: everything is closed, nothing is requested or stored
+        Carbon::setTestNow('2026-11-14 19:30:00');
+        Http::fake(['www.fitnesspark.ch/*' => Http::response('99')]);
+        $before = GymSample::count();
+        $current = $gyms->current();
+        $this->assertSame($before, GymSample::count());
+        $this->assertSame(['tomorrow 09:00', 'tomorrow 09:00', 'tomorrow 08:00', 'tomorrow 09:00'], $current->pluck('opens')->all());
+        $this->assertSame([null, null, null, null], $current->pluck('visitors')->all());
+    }
+
     public function test_gyms_page_shows_typical_visitors_per_weekday_and_hour(): void
     {
         Carbon::setTestNow('2026-11-10 17:30:00');

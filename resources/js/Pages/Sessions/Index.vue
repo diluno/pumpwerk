@@ -9,7 +9,7 @@ import { parseDate, toYmd, formatDate, daysBetween, plural } from '../../format.
 
 const props = defineProps({
     sessions: Array,
-    gyms: Array, // deferred live visitor counts: [{ key, name, visitors }]
+    gyms: Array, // deferred live visitor counts: [{ key, name, open, visitors }]
 });
 
 const active = computed(() => props.sessions.find((s) => !s.finished));
@@ -93,7 +93,9 @@ function logout() {
                 <span class="mt-2 grid grid-cols-4 gap-2">
                     <span v-for="g in gyms" :key="g.key" class="min-w-0">
                         <span class="block text-[1.75rem] leading-none font-extrabold tracking-tight">
-                            <CountUp v-if="g.visitors !== null" :value="g.visitors" /><template v-else>–</template>
+                            <CountUp v-if="g.visitors !== null" :value="g.visitors" />
+                            <span v-else-if="!g.open" class="text-base font-semibold text-muted">closed</span>
+                            <template v-else>–</template>
                         </span>
                         <span class="mt-1 block truncate text-[0.8125rem] text-muted">{{ g.name }}</span>
                     </span>

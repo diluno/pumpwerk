@@ -14,15 +14,20 @@ class GymService
 {
     /**
      * Ask every gym for its current visitor count and store the answers.
-     * Gyms that fail or answer with something that is not a number are skipped.
+     * Closed gyms are not asked; gyms that fail or answer with something that
+     * is not a number are skipped.
      *
      * @return int number of samples stored
      */
     public function poll(): int
     {
-        $locations = config('gyms.locations');
         $now = now();
-        $local = $now->copy()->setTimezone(config('gyms.timezone'));
+        $local = $this->localNow();
+        // A closed gym reports nothing useful, so it is not asked
+        $locations = collect(config('gyms.locations'))->filter(fn ($location, $key) => $this->isOpen($key, $local))->all();
+        if ($locations === []) {
+            return 0;
+        }
 
         try {
             $responses = Http::pool(fn (Pool $pool) => collect($locations)->map(
@@ -67,28 +72,71 @@ class GymService
     }
 
     /**
-     * The latest count per gym, refreshed first if it has gone stale.
+     * The latest count per open gym, refreshed first if it has gone stale.
+     * Closed gyms come back without a count and with when they open next.
      *
-     * @return Collection<int, array{key: string, name: string, visitors: ?int, minutes_ago: ?int}>
+     * @return Collection<int, array{key: string, name: string, open: bool, opens: ?string, visitors: ?int, minutes_ago: ?int}>
      */
     public function current(): Collection
     {
+        $local = $this->localNow();
+        $open = collect(config('gyms.locations'))->keys()->filter(fn ($key) => $this->isOpen($key, $local));
+
         $latest = $this->latest();
         $freshFrom = now()->subMinutes(config('gyms.fresh_minutes'));
-
-        $stale = collect(config('gyms.locations'))->keys()
-            ->contains(fn ($key) => ! isset($latest[$key]) || $latest[$key]->recorded_at->lt($freshFrom));
-        if ($stale) {
+        if ($open->contains(fn ($key) => ! isset($latest[$key]) || $latest[$key]->recorded_at->lt($freshFrom))) {
             $this->poll();
             $latest = $this->latest();
         }
 
-        return collect(config('gyms.locations'))->map(fn ($location, $key) => [
-            'key' => $key,
-            'name' => $location['name'],
-            'visitors' => $latest[$key]->visitors ?? null,
-            'minutes_ago' => isset($latest[$key]) ? (int) $latest[$key]->recorded_at->diffInMinutes(now()) : null,
-        ])->values();
+        return collect(config('gyms.locations'))->map(function ($location, $key) use ($latest, $open, $local, $freshFrom) {
+            $isOpen = $open->contains($key);
+            // Only a count from the current opening period means anything
+            $sample = $isOpen && isset($latest[$key]) && $latest[$key]->recorded_at->gte($freshFrom->copy()->subHour())
+                ? $latest[$key]
+                : null;
+
+            return [
+                'key' => $key,
+                'name' => $location['name'],
+                'open' => $isOpen,
+                'opens' => $isOpen ? null : $this->opensNext($key, $local),
+                'visitors' => $sample?->visitors,
+                'minutes_ago' => $sample ? (int) $sample->recorded_at->diffInMinutes(now()) : null,
+            ];
+        })->values();
+    }
+
+    /**
+     * Is the gym's training area open at the given local time?
+     */
+    public function isOpen(string $key, Carbon $local): bool
+    {
+        [$from, $to] = $this->hoursOn($key, $local);
+        $time = $local->format('H:i');
+
+        return $time >= $from && $time < $to;
+    }
+
+    /**
+     * When a closed gym opens next, as "06:30" or "tomorrow 09:00".
+     */
+    public function opensNext(string $key, Carbon $local): string
+    {
+        [$from] = $this->hoursOn($key, $local);
+        if ($local->format('H:i') < $from) {
+            return $from;
+        }
+
+        return 'tomorrow '.$this->hoursOn($key, $local->copy()->addDay())[0];
+    }
+
+    /**
+     * @return array{0: string, 1: string} [open, close] on that day
+     */
+    private function hoursOn(string $key, Carbon $day): array
+    {
+        return config("gyms.locations.{$key}.open")[$day->isWeekend() ? 'weekend' : 'weekday'];
     }
 
     /**

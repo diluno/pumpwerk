@@ -7,7 +7,7 @@ import { tap } from '../motion.js';
 import { plural } from '../format.js';
 
 const props = defineProps({
-    gyms: Array, // deferred: [{ key, name, visitors, minutes_ago }]
+    gyms: Array, // deferred: [{ key, name, open, opens, visitors, minutes_ago }]
     statistics: Object, // key → { days, typical: { weekday: { hour: visitors } } }
     hours: Array, // charted hours, local gym time
     weeks: Number,
@@ -47,6 +47,7 @@ const name = computed(() => liveGym.value?.name ?? '');
 // "Quieter than usual" for a gym's tile, once there is something to compare with
 function mood(gym) {
     const usual = typical(props.now.weekday, props.now.hour, gym.key);
+    if (!gym.open) return `Opens ${gym.opens}`;
     if (gym.visitors === null) return 'No count right now';
     if (!usual) return 'people right now';
     const ratio = gym.visitors / usual;
@@ -64,6 +65,7 @@ const today = computed(() =>
 const advice = computed(() => {
     const left = today.value.filter((h) => h.hour > props.now.hour && h.value);
     const usualNow = typical(props.now.weekday, props.now.hour);
+    if (liveGym.value && !liveGym.value.open && !left.length) return `Closed for today. Opens ${liveGym.value.opens}.`;
     if (!left.length) return 'No more open hours with data today.';
     const best = left.reduce((a, b) => (b.value < a.value ? b : a));
     if (usualNow && usualNow <= best.value) return `It usually doesn’t get quieter than now today (around ${usualNow}).`;
@@ -134,7 +136,9 @@ const columns = computed(() => ({ gridTemplateColumns: `2.25rem repeat(${props.h
                 >
                     <span class="block font-semibold">{{ g.name }}</span>
                     <span class="mt-1 block text-[2.75rem] leading-none font-extrabold tracking-[-0.03em]">
-                        <CountUp v-if="g.visitors !== null" :value="g.visitors" /><template v-else>–</template>
+                        <CountUp v-if="g.visitors !== null" :value="g.visitors" />
+                        <span v-else-if="!g.open" class="text-[1.75rem] tracking-tight">Closed</span>
+                        <template v-else>–</template>
                     </span>
                     <span class="mt-1 block text-sm" :class="selected === g.key ? 'text-faint' : 'text-muted'">{{ mood(g) }}</span>
                 </button>
@@ -198,7 +202,7 @@ const columns = computed(() => ({ gridTemplateColumns: `2.25rem repeat(${props.h
             </div>
 
             <p class="mt-5 text-sm text-muted">
-                Based on {{ plural(stats.days, 'day') }} of counts for this gym, saved every 10 minutes while it is open. The picture covers the last {{ weeks }} weeks
+                Based on {{ plural(stats.days, 'day') }} of counts for this gym, saved every 10 minutes while it is open. Holiday hours are not taken into account. The picture covers the last {{ weeks }} weeks
                 and sharpens as more days come in.
             </p>
         </template>

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\RunCoach;
 use App\Models\CoachProfile;
 use App\Models\Machine;
 use App\Models\User;
@@ -21,11 +22,16 @@ class AiCoachTest extends TestCase
 
     private Machine $row;
 
+    /** What the fake OpenAI endpoint does next; swap it to change the answer mid-test */
+    private \Closure $openAi;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->actingAs(User::factory()->create());
         config(['services.openai.key' => 'test-key']);
+        // Later Http::fake() calls do not replace earlier ones, so register one fake that defers to $this->openAi
+        Http::fake(['api.openai.com/*' => fn ($request, $options) => ($this->openAi)($request, $options)]);
 
         $this->chest = Machine::create(['slug' => 'chest-press', 'name' => 'Chest Press', 'muscle_group' => 'chest']);
         $this->row = Machine::create(['slug' => 'row', 'name' => 'Row', 'muscle_group' => 'back']);
@@ -48,9 +54,7 @@ class AiCoachTest extends TestCase
     /** The model answers with a JSON object as message content */
     private function fakeAnswer(array $answer): void
     {
-        Http::fake(['api.openai.com/*' => Http::response([
-            'choices' => [['message' => ['content' => json_encode($answer)]]],
-        ])]);
+        $this->openAi = fn () => Http::response(['choices' => [['message' => ['content' => json_encode($answer)]]]]);
     }
 
     public function test_plan_is_structured_and_made_safe_for_the_app(): void
@@ -122,6 +126,15 @@ class AiCoachTest extends TestCase
         $this->assertSame(154.5, $fresh->feedback_targets[0]['weight']);
         $this->assertSame('Responds well to small steps on chest press.', CoachProfile::current()->memory);
 
+        // Feedback regenerated for an older session leaves the coach's notes alone
+        $this->fakeAnswer(['feedback' => 'Old news', 'next_targets' => [], 'memory' => 'Outdated note.']);
+        $old = WorkoutSession::where('date', '2026-07-30')->first();
+        // (run the job directly: within one test, after-response jobs of earlier requests fire again)
+        RunCoach::dispatchSync($old, 'feedback');
+        $this->assertSame('Old news', $old->fresh()->ai_feedback);
+        $this->assertSame('## Solid', $this->session->fresh()->ai_feedback);
+        $this->assertSame('Responds well to small steps on chest press.', CoachProfile::current()->memory);
+
         // The next session aims for the coach's target instead of the plain rule
         $next = WorkoutSession::create(['date' => '2026-08-05']);
         $next->exercises()->create(['machine_id' => $this->chest->id]);
@@ -134,11 +147,11 @@ class AiCoachTest extends TestCase
     {
         $url = "/sessions/{$this->session->id}/ai-feedback";
 
-        Http::fake(['api.openai.com/*' => Http::response(['error' => 'boom'], 500)]);
+        $this->openAi = fn () => Http::response(['error' => 'boom'], 500);
         $this->post($url)->assertRedirect();
         $this->assertStringContainsString('OpenAI error 500', $this->session->fresh()->coach_error);
 
-        Http::fake(['api.openai.com/*' => Http::failedConnection()]);
+        $this->openAi = Http::failedConnection();
         $this->post("/sessions/{$this->session->id}/plan")->assertRedirect();
         $this->assertStringContainsString('too long', $this->session->fresh()->coach_error);
 

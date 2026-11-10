@@ -59,7 +59,10 @@ class RunCoach
             'ai_feedback' => $result['feedback'],
             'feedback_targets' => $result['targets'],
         ]);
-        if ($result['memory'] !== '') {
+        // The coach's running notes only move forward: feedback regenerated for
+        // an older session must not overwrite what it has learned since.
+        $latestId = WorkoutSession::orderByDesc('date')->orderByDesc('id')->value('id');
+        if ($result['memory'] !== '' && $this->session->id === $latestId) {
             CoachProfile::current()->update(['memory' => $result['memory']]);
         }
     }

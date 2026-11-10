@@ -52,7 +52,7 @@ Copy `.env.example` and set:
 
 ## Design notes
 
-- **Weight bands.** Weights are colour-coded light to heavy (green ≤ 70 lb, yellow ≤ 130, blue ≤ 190, red above), like competition plates. The limits and colours live in `resources/js/bands.js`, mirrored as `--color-*` tokens in `resources/css/app.css`.
+- **Weight bands.** Weights are colour-coded light to heavy (green ≤ 70 lb, yellow ≤ 90, blue ≤ 110, red above; the quartiles of the weights actually logged), like competition plates. The limits and colours live in `resources/js/bands.js`, mirrored as `--color-*` tokens in `resources/css/app.css`.
 - **The stack.** `resources/js/Components/WeightStack.vue` shows a window of 11 plates that follows the pin; `resources/js/machineWeight.js` holds the plate maths (20 lb plates from 30, add-ons of 2.3 / 4.5 / 6.8).
 - **Motion.** Page changes use the View Transitions API through Inertia (`resources/js/app.js`); everything else is CSS in `app.css` plus two helpers in `resources/js/motion.js`. All of it switches off under `prefers-reduced-motion`.
 
@@ -69,7 +69,7 @@ Copy `.env.example` and set:
 
 ## Gym visitor counts
 
-`config/gyms.php` lists the gyms and the public Fitnesspark endpoint. `artisan gyms:poll` stores one count per gym in `gym_samples`; the scheduler runs it every 10 minutes between 06:00 and 23:00 Zurich time (`routes/console.php`). **The server needs the scheduler cron** (`* * * * * php artisan schedule:run`), otherwise counts are only saved when someone opens the app and no pattern builds up. Statistics cover the last 8 weeks; samples older than 180 days are pruned.
+`config/gyms.php` lists the gyms and the public Fitnesspark endpoint. `artisan gyms:poll` stores one count per gym in `gym_samples`; the scheduler runs it every 10 minutes between 06:00 and 22:00 Zurich time (`routes/console.php`), and a gym is only asked while it is open (opening hours per gym in `config/gyms.php`; special holiday hours are not modelled). **The server needs the scheduler cron** (`* * * * * php artisan schedule:run`), otherwise counts are only saved when someone opens the app and no pattern builds up. Statistics cover the last 8 weeks; samples older than 180 days are pruned.
 
 ## Testing & linting
 
