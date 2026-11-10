@@ -13,6 +13,10 @@ class WorkoutSession extends Model
     protected $casts = [
         'date' => 'date:Y-m-d',
         'finished_at' => 'datetime',
+        'plan_data' => 'array',
+        'feedback_targets' => 'array',
+        'plan_requested_at' => 'datetime',
+        'feedback_requested_at' => 'datetime',
     ];
 
     public function exercises(): HasMany
@@ -69,6 +73,26 @@ class WorkoutSession extends Model
                 'sets' => $e->sets->map->only(['weight', 'reps'])->all(),
             ]])
             ->all();
+    }
+
+    /**
+     * Where the background coach requests stand, for the client.
+     * A request that never came back (worker killed) is turned into an error here.
+     */
+    public function coachState(): array
+    {
+        $stale = now()->subSeconds(config('coach.stale_after'));
+        foreach (['plan_requested_at', 'feedback_requested_at'] as $column) {
+            if ($this->$column?->lt($stale)) {
+                $this->update([$column => null, 'coach_error' => 'The coach took too long to answer. Try again in a moment.']);
+            }
+        }
+
+        return [
+            'plan_pending' => $this->plan_requested_at !== null,
+            'feedback_pending' => $this->feedback_requested_at !== null,
+            'error' => $this->coach_error,
+        ];
     }
 
     public function isFinished(): bool

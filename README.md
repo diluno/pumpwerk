@@ -9,7 +9,7 @@ Built as a single-user app: no registration, no multi-tenancy, just fast logging
 - **Session logging** — create a workout session, add machines from a catalog, set the weight on an on-screen weight stack (tap a plate to move the pin, toggle an add-on plate), and log cardio entries.
 - **Machine history** — pick a machine and see everything you've ever done on it.
 - **Progression charts** — one bar per session for each machine, coloured by weight band.
-- **AI coach** — on-demand feedback for a finished session and a plan for the next one (with an optional steering note), powered by OpenAI.
+- **AI coach** — plans a session as structured targets that load onto the weight stack, gives feedback with targets for next time, remembers what it learned about you, and falls back to a plain progression rule when it has said nothing. Powered by OpenAI.
 - **Gym visitors** — live visitor counts of four Fitnesspark gyms, sampled every 10 minutes, with a typical-day curve and a week heatmap showing when each gym is quiet.
 - **PWA** — installable on the home screen for quick access at the gym.
 
@@ -59,7 +59,10 @@ Copy `.env.example` and set:
 ## Architecture notes
 
 - **Single-user by design.** Models are not scoped by `user_id`. Don't add a second account without adding scoping first.
-- **AI requests are synchronous** — the feedback/plan endpoints call OpenAI inline (50 s timeout, kept below the server's 60 s PHP-FPM limit); there is no queue worker. Failures come back as a validation error (`coach`) and show as a toast.
+- **Coach requests run in the background.** The plan/feedback endpoints mark the session as pending, answer immediately and run `App\Jobs\RunCoach` after the response (no queue worker needed). The session page polls until the answer or an error is stored on the session. The job still runs inside the PHP-FPM request, so `config/coach.php`'s timeout (50 s) must stay below the server's 60 s limit.
+- **The coach answers in JSON** (OpenAI structured output). `CoachService` then keeps only machines that exist, snaps weights to what the stack can produce (`App\Services\MachineWeights`) and clamps reps and sets, so the app can act on the answer.
+- **What the coach sees:** the athlete profile and its own running notes (`coach_profiles`), computed per-machine facts (frequency, recency, trend, stalls), sets per muscle group, and the latest sessions. Machines carry a `muscle_group`, guessed from the name and editable on the machine's history page.
+- **Targets** (`App\Services\Progression`): today's plan, else the coach's "next time" from the last feedback, else a progression rule in the athlete's own rep range (default 12–15, set in the coach profile): reach the top on every set, then go up one step.
 - `artisan import:v1` imports data from the previous tracker (one-time, kept for reference).
 - Prompt/LLM logic lives in `app/Services/CoachService.php`.
 - Dates are plain `YYYY-MM-DD`; the client sends its local date when starting a session and parses dates via `resources/js/format.js` (never `new Date('YYYY-MM-DD')`, which is UTC).

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CoachProfile;
 use App\Models\Machine;
 use App\Models\WorkoutSession;
 use App\Services\GymService;
+use App\Services\Progression;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -53,9 +55,10 @@ class SessionController extends Controller
         return redirect()->route('sessions.show', $session);
     }
 
-    public function show(WorkoutSession $session)
+    public function show(WorkoutSession $session, Progression $progression)
     {
         $session->load(['exercises.machine', 'exercises.sets', 'cardioEntries']);
+        $last = $session->lastPerformances();
 
         return Inertia::render('Sessions/Show', [
             'session' => [
@@ -63,8 +66,11 @@ class SessionController extends Controller
                 'date' => $session->date->format('Y-m-d'),
                 'notes' => $session->notes,
                 'ai_feedback' => $session->ai_feedback,
-                'plan' => $session->plan,
+                'feedback_targets' => $session->feedback_targets ?? [],
+                // Plans made before plans were structured only have text
+                'plan' => $session->plan_data ?? ($session->plan ? ['text' => $session->plan, 'items' => []] : null),
                 'plan_prompt' => $session->plan_prompt,
+                'coach' => $session->coachState(),
                 'finished' => $session->isFinished(),
                 'exercises' => $session->exercises->map(fn ($e) => [
                     'id' => $e->id,
@@ -77,7 +83,10 @@ class SessionController extends Controller
                     'id', 'type', 'duration_minutes', 'pace_seconds', 'distance_km', 'notes',
                 ]),
             ],
-            'lastByMachine' => (object) $session->lastPerformances(),
+            'lastByMachine' => (object) $last,
+            // What to aim for per machine: plan, else last feedback, else the progression rule
+            'targets' => (object) ($session->isFinished() ? [] : $progression->targets($session, $last)),
+            'profile' => CoachProfile::current()->forClient(),
             'previousFeedback' => $session->isFinished() ? null : $this->previousFeedback($session),
             // Only an open session can add machines.
             'machines' => $session->isFinished() ? [] : Machine::forPicker(),

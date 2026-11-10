@@ -13,9 +13,12 @@ createInertiaApp({
             .mount(el);
     },
     // Page-to-page navigation animates with the View Transitions API where the
-    // browser has it. Form posts (logging a set) keep their own in-page motion.
+    // browser has it. Form posts (logging a set) keep their own in-page motion,
+    // and background reloads (polling, partial reloads) must not animate at all.
     defaults: {
-        visitOptions: (href, options) => ({ viewTransition: (options.method ?? 'get') === 'get' }),
+        visitOptions: (href, options) => ({
+            viewTransition: (options.method ?? 'get') === 'get' && !options.async && !options.only?.length,
+        }),
     },
     progress: {
         color: '#15151b',

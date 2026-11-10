@@ -46,4 +46,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/sessions/{session}/ai-feedback', [CoachController::class, 'feedback'])->name('ai-feedback.store');
     Route::post('/sessions/{session}/plan', [CoachController::class, 'plan'])->name('plan.store');
+    Route::post('/sessions/{session}/plan/apply', [CoachController::class, 'applyPlan'])->name('plan.apply');
+    Route::patch('/coach/profile', [CoachController::class, 'updateProfile'])->name('coach.profile');
+    Route::patch('/machines/{machine}', [MachineController::class, 'update'])->name('machines.update');
 });

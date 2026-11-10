@@ -13,6 +13,7 @@ const props = defineProps({
     session: Object, // { id, date }
     exercise: Object, // { id, machine_id, machine_name, notes, sets }
     last: Object, // previous time on this machine: { date, sets } | null
+    target: Object, // what to aim for: { weight, reps, sets, source: plan|feedback|rule, reason } | null
     position: Number,
     count: Number,
     previousId: Number,
@@ -22,8 +23,10 @@ const props = defineProps({
 const keep = { preserveScroll: true };
 const sets = computed(() => props.exercise.sets);
 
-// The next set starts from the set just logged; a fresh machine starts from last time.
-const seed = sets.value.at(-1) ?? props.last?.sets[0] ?? { weight: 30, reps: 10 };
+// The next set starts from the set just logged; a fresh machine starts from
+// its target (coach plan, coach feedback or the progression rule), else from last time.
+const seed = sets.value.at(-1) ?? props.target ?? props.last?.sets[0] ?? { weight: 30, reps: 10 };
+const sourceLabel = { plan: 'Coach plan', feedback: 'Coach target', rule: 'Next step' };
 const weight = ref(seed.weight);
 const reps = ref(seed.reps);
 const logging = ref(false);
@@ -146,6 +149,14 @@ const round = 'press grid h-11 w-11 place-items-center rounded-full bg-soft';
         </div>
         <p v-else class="mt-2 text-muted">First time on this machine.</p>
 
+        <button v-if="target" class="press mt-2.5 flex w-full items-center gap-3 rounded-3xl bg-soft py-2 pr-4 pl-2 text-left" :aria-label="`Use target ${setLabel(target)}`" @click="use(target)">
+            <span class="rounded-2xl bg-ink px-3 py-1.5 font-extrabold whitespace-nowrap text-bg tabular-nums">{{ setLabel(target) }}</span>
+            <span class="min-w-0 flex-1 text-[0.9375rem] leading-snug">
+                <span class="font-semibold">{{ sourceLabel[target.source] }}, {{ plural(target.sets, 'set') }}.</span>
+                <span v-if="target.reason" class="block text-muted">{{ target.reason }}</span>
+            </span>
+        </button>
+
         <WeightStack v-model="weight" :lift="lift" class="mt-4" />
 
         <div class="mt-3 flex items-stretch gap-2.5">
@@ -156,7 +167,9 @@ const round = 'press grid h-11 w-11 place-items-center rounded-full bg-soft';
                 </p>
                 <button class="press w-[3.125rem] text-[1.75rem] leading-none" aria-label="More reps" @click="bumpReps(1)">+</button>
             </div>
-            <button class="btn-primary h-[3.875rem] flex-1 text-[1.375rem]" :disabled="logging" @click="logSet">Log set {{ sets.length + 1 }}</button>
+            <button class="btn-primary h-[3.875rem] flex-1 text-[1.375rem]" :disabled="logging" @click="logSet">
+                Log set {{ sets.length + 1 }}<template v-if="target && sets.length < target.sets"> of {{ target.sets }}</template>
+            </button>
         </div>
 
         <TransitionGroup name="pop" tag="div" class="relative mt-4 flex min-h-11 flex-wrap items-center gap-2">

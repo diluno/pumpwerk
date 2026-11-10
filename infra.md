@@ -41,11 +41,12 @@ Personal workout tracker (Laravel 12 + Inertia/Vue 3). Audited 2026-08-02, re-ve
   Unused by the code — remove it from the Forge env editor.
 
 ## Cron
-- **Needed since the gym visitor feature (2026-11-10):** the Laravel scheduler must run every minute
-  (`* * * * * cd /home/forge/pumpwerk.dil.uno/current && php artisan schedule:run`) so `gyms:poll`
-  samples visitor counts every 10 minutes. Add it in Forge (Scheduler) once the feature is deployed;
-  as of 2026-11-10 it is NOT set up yet (see line below).
-- No forge-user crontab; no Laravel scheduler entries. Only system cron (certbot renewals, php, sysstat).
+- **Laravel scheduler runs every minute via Forge's Scheduler** (added in the Forge dashboard
+  2026-11-10; job log `~/.forge/scheduled-2213785.log`). It drives `gyms:poll` every 10 minutes
+  between 06:00 and 23:00 Zurich time. Verified 2026-11-10: four samples stored at 20:30:02 UTC.
+- The forge crontab holds one entry, `15 5 * * * /home/forge/bin/backup-sites.sh` (seen 2026-11-10;
+  the Backups section below predates it and needs re-checking). Otherwise only system cron
+  (certbot renewals, php, sysstat).
 
 ## Backups — ⚠️ NOT COVERED
 - **Still true as of 2026-08-11.** `backup-status` reports 5/14 servers covered and lists willow
@@ -71,9 +72,9 @@ Personal workout tracker (Laravel 12 + Inertia/Vue 3). Audited 2026-08-02, re-ve
   tracker; keep for reference.
 - Single-user app: no registration, models not user-scoped (intentional — do not add a second
   account without adding `user_id` scoping). Login user seeded with `APP_USER_EMAIL`.
-- AI endpoints block the request up to 50 s (no queue worker configured). The server kills requests
-  at 60 s (`request_terminate_timeout` / `max_execution_time` / `fastcgi_read_timeout`, checked
-  2026-11-10), so the timeout in `CoachService` must stay below that. OpenAI errors come back as a
-  `coach` validation error shown as a toast.
+- AI coach requests run after the HTTP response inside the same PHP-FPM request (no queue worker).
+  The server kills requests at 60 s (`request_terminate_timeout` / `max_execution_time` /
+  `fastcgi_read_timeout`, checked 2026-11-10), so the timeout in `config/coach.php` (50 s) must stay
+  below that. Errors are stored on the session (`coach_error`) and shown on the session page.
 - Production PHP is 8.5, local is 8.4, composer requires `^8.3` — fine, but test locally before
   relying on 8.5-only behavior.

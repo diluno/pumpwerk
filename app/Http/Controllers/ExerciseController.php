@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Exercise;
 use App\Models\Machine;
 use App\Models\WorkoutSession;
+use App\Services\Progression;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -33,7 +34,7 @@ class ExerciseController extends Controller
     /**
      * The logging screen for one machine of an open session.
      */
-    public function show(Exercise $exercise)
+    public function show(Exercise $exercise, Progression $progression)
     {
         $session = $exercise->session;
         if ($session->isFinished()) {
@@ -41,6 +42,7 @@ class ExerciseController extends Controller
         }
 
         $exercise->load(['machine', 'sets']);
+        $last = $session->lastPerformances();
         $ids = $session->exercises->pluck('id')->values();
         $index = $ids->search($exercise->id);
         $count = $ids->count();
@@ -57,7 +59,9 @@ class ExerciseController extends Controller
                 'notes' => $exercise->notes,
                 'sets' => $exercise->sets->map->only(['id', 'set_number', 'weight', 'reps']),
             ],
-            'last' => $session->lastPerformances()[$exercise->machine_id] ?? null,
+            'last' => $last[$exercise->machine_id] ?? null,
+            // What to aim for: plan, else last feedback, else the progression rule
+            'target' => $progression->targets($session, $last)[$exercise->machine_id] ?? null,
             'position' => $index + 1,
             'count' => $count,
             'previousId' => $count > 1 ? $ids[($index - 1 + $count) % $count] : null,

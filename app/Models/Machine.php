@@ -26,7 +26,22 @@ class Machine extends Model
         // Names without any sluggable characters (e.g. "#1") still need a unique slug.
         $slug = Str::slug($name) ?: 'machine-'.substr(md5(Str::lower($name)), 0, 8);
 
-        return self::firstOrCreate(['slug' => $slug], ['name' => $name]);
+        return self::firstOrCreate(['slug' => $slug], ['name' => $name, 'muscle_group' => self::guessMuscleGroup($name)]);
+    }
+
+    /**
+     * A first guess at the muscle group from the machine's name; editable afterwards.
+     */
+    public static function guessMuscleGroup(string $name): string
+    {
+        $name = Str::lower($name);
+        foreach (config('coach.muscle_keywords') as $group => $keywords) {
+            if (Str::contains($name, $keywords)) {
+                return $group;
+            }
+        }
+
+        return 'other';
     }
 
     /**

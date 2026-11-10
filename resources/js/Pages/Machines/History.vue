@@ -5,7 +5,14 @@ import AppLayout from '../../Layouts/AppLayout.vue';
 import MachineBlock from '../../Components/MachineBlock.vue';
 import { num, shortDate, formatDate, plural, setsSentence, topWeight } from '../../format.js';
 
-const props = defineProps({ machine: Object, exercises: Array });
+const props = defineProps({ machine: Object, exercises: Array, muscleGroups: Array });
+
+// The coach uses the muscle group to keep your training balanced
+function setGroup(group) {
+    if (group !== props.machine.muscle_group) {
+        router.patch(`/machines/${props.machine.id}`, { muscle_group: group }, { preserveScroll: true });
+    }
+}
 
 // Heaviest set ever; more reps break a tie
 const best = computed(() => {
@@ -41,6 +48,21 @@ function back() {
             <b class="font-semibold text-ink">{{ num(best.weight) }} lb × {{ best.reps }}</b> on {{ shortDate(best.date) }}.
         </p>
         <p v-else class="mt-2 text-muted">Not used in any session yet.</p>
+
+        <div class="-mx-5 mt-4 flex items-center gap-1.5 overflow-x-auto px-5" role="radiogroup" aria-label="Muscle group">
+            <button
+                v-for="g in muscleGroups"
+                :key="g"
+                role="radio"
+                :aria-checked="machine.muscle_group === g"
+                class="press h-9 shrink-0 rounded-full px-3.5 text-[0.9375rem] font-semibold capitalize"
+                :class="machine.muscle_group === g ? 'bg-ink text-bg' : 'bg-soft text-ink'"
+                @click="setGroup(g)"
+            >
+                {{ g }}
+            </button>
+        </div>
+        <p class="mt-1.5 text-sm text-muted">The muscle group helps the coach keep your training balanced.</p>
 
         <div class="mt-4 space-y-2">
             <Link
